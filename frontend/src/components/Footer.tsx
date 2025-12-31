@@ -7,7 +7,7 @@ export default function Footer() {
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
                     <div>
                         <h3 className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-primary to-neon-blue mb-4">
-                            WEI Fansub
+                            HuaPlay
                         </h3>
                         <p className="text-gray-400 text-sm">
                             Sua plataforma de streaming de séries asiáticas com experiência premium e imersiva.
@@ -46,7 +46,10 @@ export default function Footer() {
                 </div>
 
                 <div className="border-t border-gray-800 mt-8 pt-8 text-center text-sm text-gray-500">
-                    © {new Date().getFullYear()} WEI Fansub. Todos os direitos reservados.
+                    <p className="mb-4 max-w-4xl mx-auto opacity-70">
+                        O HuaPlay é um projeto exclusivamente acadêmico e funciona como um indexador de links encontrados na web, operando de forma semelhante ao Stremio/Torrent. Não hospedamos nenhum arquivo de vídeo em nossos servidores.
+                    </p>
+                    © {new Date().getFullYear()} HuaPlay. Todos os direitos reservados.
                 </div>
             </div>
         </footer>

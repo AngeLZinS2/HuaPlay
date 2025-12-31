@@ -47,7 +47,7 @@ export default function Login() {
             >
                 <div className="text-center mb-8">
                     <h1 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-primary to-neon-blue inline-block mb-2">
-                        WEI Fansub
+                        HuaPlay
                     </h1>
                     <p className="text-gray-400">
                         {isLogin ? "Bem-vindo de volta!" : "Junte-se a nós"}

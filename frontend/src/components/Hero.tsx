@@ -41,25 +41,22 @@ export default function Hero() {
             <div className="relative h-screen w-full overflow-hidden bg-black">
                 <div className="absolute inset-0 select-none pointer-events-none">
                     <img
-                        src="/Wei banner.jpg"
-                        alt="Wei Fansub"
-                        className="w-full h-full object-contain"
+                        src="/Banner Wei.png"
+                        alt="HuaPlay"
+                        className="w-full h-full object-cover"
                     />
                     <div className="absolute inset-0 bg-black/40" />
                     <div className="absolute inset-0 bg-gradient-to-t from-[#141414] via-transparent to-transparent" />
                 </div>
-                <div className="relative h-full w-full px-12 md:px-20 lg:px-24 flex items-center pt-32">
+                <div className="relative h-full w-full px-4 flex flex-col items-center justify-end pb-40">
                     <motion.div
                         initial={{ opacity: 0, y: 50 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ duration: 0.8 }}
-                        className="max-w-2xl space-y-6"
+                        className="text-center"
                     >
-                        <h1 className="text-6xl md:text-8xl font-black leading-tight text-white drop-shadow-2xl tracking-tighter">
-                            WEI Fansub
-                        </h1>
-                        <p className="text-xl text-gray-200 drop-shadow-md">
-                            O melhor do entretenimento asiático para você.
+                        <p className="text-xl md:text-2xl text-gray-200 font-light tracking-widest uppercase drop-shadow-lg bg-black/30 backdrop-blur-sm py-2 px-6 rounded-full border border-white/10">
+                            O melhor do entretenimento asiático para você
                         </p>
                     </motion.div>
                 </div>

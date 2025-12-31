@@ -58,13 +58,13 @@ export default function Navbar() {
                     {/* Assuming existing logo logic. Reference image doesn't show logo, just menu. keeping logo for functionality */}
                     <Link to="/" className="flex items-center gap-3 group mr-8">
                         <img
-                            src="/Logo Wei.jpg"
-                            alt="WEI Fansub"
+                            src="/Logo Wei.png"
+                            alt="HuaPlay"
                             className="h-10 w-auto object-contain rounded-full shadow-lg group-hover:scale-105 transition-transform duration-300"
                         />
                         <div className="flex items-center">
-                            <span className="text-2xl font-display font-bold text-primary tracking-wider">WEI</span>
-                            <span className="text-2xl font-display font-bold text-white tracking-widest ml-2">FANSUB</span>
+                            <span className="text-2xl font-display font-bold text-primary tracking-wider">Hua</span>
+                            <span className="text-2xl font-display font-bold text-white tracking-widest ml-1">Play</span>
                         </div>
                     </Link>
 
