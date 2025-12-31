@@ -1,0 +1,17 @@
+# Python
+__pycache__/
+*.py[cod]
+*.so
+venv/
+.env
+
+# Database types usually ignored, but we want weifansub.db
+# We ignore the journal files though
+*.db-shm
+*.db-wal
+
+# VS Code
+.vscode/
+
+# Logs
+*.log

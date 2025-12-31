@@ -1,0 +1,166 @@
+import { useState, useEffect, useRef } from 'react';
+import { motion } from 'framer-motion';
+import { Play, Plus, Volume2, VolumeX } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import api from '../services/api';
+
+export default function Hero() {
+    const [featured, setFeatured] = useState<any | null>(null);
+    const [isMuted, setIsMuted] = useState(true);
+    const iframeRef = useRef<HTMLIFrameElement>(null);
+    const navigate = useNavigate();
+
+    useEffect(() => {
+        const fetchFeatured = async () => {
+            try {
+                const response = await api.get('/series/?is_featured=true');
+                const featuredSeries = response.data.length > 0 ? response.data[0] : null;
+                if (featuredSeries) {
+                    setFeatured(featuredSeries);
+                }
+            } catch (error) {
+                console.error("Failed to fetch featured series:", error);
+            }
+        };
+        fetchFeatured();
+    }, []);
+
+    useEffect(() => {
+        if (iframeRef.current && iframeRef.current.contentWindow) {
+            const command = isMuted ? 'mute' : 'unMute';
+            iframeRef.current.contentWindow.postMessage(JSON.stringify({
+                'event': 'command',
+                'func': command,
+                'args': []
+            }), '*');
+        }
+    }, [isMuted, featured]);
+
+    if (!featured) {
+        return (
+            <div className="relative h-screen w-full overflow-hidden bg-black">
+                <div className="absolute inset-0 select-none pointer-events-none">
+                    <img
+                        src="/Wei banner.jpg"
+                        alt="Wei Fansub"
+                        className="w-full h-full object-contain"
+                    />
+                    <div className="absolute inset-0 bg-black/40" />
+                    <div className="absolute inset-0 bg-gradient-to-t from-[#141414] via-transparent to-transparent" />
+                </div>
+                <div className="relative h-full w-full px-12 md:px-20 lg:px-24 flex items-center pt-32">
+                    <motion.div
+                        initial={{ opacity: 0, y: 50 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.8 }}
+                        className="max-w-2xl space-y-6"
+                    >
+                        <h1 className="text-6xl md:text-8xl font-black leading-tight text-white drop-shadow-2xl tracking-tighter">
+                            WEI Fansub
+                        </h1>
+                        <p className="text-xl text-gray-200 drop-shadow-md">
+                            O melhor do entretenimento asiático para você.
+                        </p>
+                    </motion.div>
+                </div>
+            </div>
+        );
+    }
+
+    return (
+        <div className="relative h-screen w-full overflow-hidden">
+            {/* Background Video/Image */}
+            <div className="absolute inset-0 select-none pointer-events-none">
+                {featured.trailer_url ? (
+                    <div className="relative w-full h-full overflow-hidden">
+                        <iframe
+                            ref={iframeRef}
+                            src={`${featured.trailer_url}?enablejsapi=1&autoplay=1&mute=1&controls=0&modestbranding=1&loop=1&playlist=${featured.trailer_url.split('/').pop()}&vq=hd1080`}
+                            className="absolute top-1/2 left-1/2 w-[150vw] h-[150vh] -translate-x-1/2 -translate-y-1/2 pointer-events-none object-cover"
+                            frameBorder="0"
+                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                        />
+                    </div>
+                ) : (
+                    <img
+                        src={featured.banner_image || featured.cover_image}
+                        alt={featured.title}
+                        className="w-full h-full object-cover"
+                    />
+                )}
+                {/* Cinematic Gradient Overlays */}
+                <div className="absolute inset-0 bg-black/30" />
+                <div className="absolute inset-0 bg-gradient-to-t from-[#050505] via-transparent to-transparent" />
+                <div className="absolute inset-0 bg-gradient-to-r from-[#050505] via-[#050505]/40 to-transparent" />
+                <div className="absolute bottom-0 w-full h-32 bg-gradient-to-t from-[#050505] to-transparent" />
+            </div>
+
+            {/* Content */}
+            <div className="relative h-full w-full px-12 md:px-20 lg:px-24 flex items-center pt-32">
+                <motion.div
+                    initial={{ opacity: 0, y: 50 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.8, delay: 0.2 }}
+                    className="max-w-3xl space-y-8"
+                >
+                    <motion.div
+                        initial={{ opacity: 0, x: -20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: 0.5 }}
+                        className="flex items-center gap-3 mb-4"
+                    >
+                        <div className="h-[2px] w-12 bg-primary"></div>
+                        <span className="text-primary font-display font-bold tracking-[0.2em] text-sm uppercase glow-text">
+                            Destaque Semanal
+                        </span>
+                    </motion.div>
+
+                    <h1 className="text-6xl md:text-8xl font-display font-bold leading-none text-transparent bg-clip-text bg-gradient-to-b from-white to-gray-400 drop-shadow-2xl">
+                        {featured.title}
+                    </h1>
+
+                    <div className="flex items-center gap-6 text-gray-200 font-sans text-lg tracking-wide border-l-2 border-primary pl-4">
+                        <span className="text-primary font-bold">98% Match</span>
+                        <span>{featured.release_year}</span>
+                        <span className="px-2 py-0.5 border border-white/20 rounded text-xs bg-black/40 backdrop-blur-sm">{featured.status}</span>
+                        <span className="px-2 py-0.5 border border-white/20 rounded text-xs bg-black/40 backdrop-blur-sm">HD</span>
+                    </div>
+
+                    <p className="text-gray-300 text-lg max-w-2xl line-clamp-3 font-light leading-relaxed drop-shadow-md">
+                        {featured.description || "Uma história envolvente que vai prender sua atenção do início ao fim. Descubra os segredos e emoções desta incrível produção asiática."}
+                    </p>
+
+                    <div className="flex flex-wrap items-center gap-5 pt-6">
+                        <motion.button
+                            whileHover={{ scale: 1.05, textShadow: "0 0 8px rgba(212, 175, 55, 0.5)" }}
+                            whileTap={{ scale: 0.95 }}
+                            onClick={() => navigate(`/series/${featured.slug || featured.id}`)}
+                            className="group flex items-center gap-3 px-10 py-4 bg-gradient-to-r from-primary to-[#b8860b] text-black rounded-sm font-display font-bold text-xl hover:brightness-110 transition-all shadow-[0_0_20px_rgba(212,175,55,0.3)]"
+                        >
+                            <Play className="w-6 h-6 fill-black group-hover:fill-current transition-colors" />
+                            ASSISTIR AGORA
+                        </motion.button>
+
+                        <motion.button
+                            whileHover={{ scale: 1.05, borderColor: "#D4AF37", color: "#D4AF37" }}
+                            whileTap={{ scale: 0.95 }}
+                            className="flex items-center gap-3 px-8 py-4 border border-white/30 bg-black/40 backdrop-blur-md text-white rounded-sm font-display font-bold text-xl transition-all hover:bg-black/60"
+                        >
+                            <Plus className="w-6 h-6" />
+                            MINHA LISTA
+                        </motion.button>
+
+                        {featured.trailer_url && (
+                            <button
+                                onClick={() => setIsMuted(!isMuted)}
+                                className="p-4 border border-white/10 rounded-full text-gray-400 hover:text-primary hover:border-primary/50 bg-black/60 backdrop-blur-md transition-all ml-auto md:ml-4"
+                            >
+                                {isMuted ? <VolumeX className="w-6 h-6" /> : <Volume2 className="w-6 h-6" />}
+                            </button>
+                        )}
+                    </div>
+                </motion.div>
+            </div>
+        </div>
+    );
+}

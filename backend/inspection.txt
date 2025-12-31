@@ -1,0 +1,39 @@
+Fetching https://weifansub.com.br/2021/03/25/choc-tuc-vo-yeu/...
+Status Code: 200
+
+--- Robust Search ---
+H1: Chọc Tức Vợ Yêu (Classes: ['post-title'])
+
+--- Date Search ---
+Found '2021' in <script class='None'>: var mi_version = '9.11.0';
+				var mi_track_user =...
+Found '2021' in <span class='['post-date']'>: 25 de março de 2021...
+Found '2021' in <script class='None'>: window.WPCOM_sharing_counts={"https:\/\/weifansub....
+Found '2021' in <script class='None'>: var jetpackSwiperLibraryPath={"url":"https://weifa...
+
+--- Episode Search ---
+Found 'EPISÓDIO' in <strong class='None'>
+Found 'EPISÓDIO' in <strong class='None'>
+Found 'EPISÓDIO' in <strong class='None'>
+Found 'EPISÓDIO' in <strong class='None'>
+Found 'EPISÓDIO' in <strong class='None'>
+Found 'EPISÓDIO' in <strong class='None'>
+Found 'EPISÓDIO' in <strong class='None'>
+Found 'EPISÓDIO' in <strong class='None'>
+Found 'EPISÓDIO' in <strong class='None'>
+Found 'EPISÓDIO' in <strong class='None'>
+Found 'EPISÓDIO' in <strong class='None'>
+Found 'EPISÓDIO' in <strong class='None'>
+Found 'EPISÓDIO' in <strong class='None'>
+Found 'EPISÓDIO' in <strong class='None'>
+Found 'EPISÓDIO' in <strong class='None'>
+Found 'EPISÓDIO' in <strong class='None'>
+Found 'EPISÓDIO' in <strong class='None'>
+Found 'EPISÓDIO' in <strong class='None'>
+Found 'EPISÓDIO' in <strong class='None'>
+Found 'EPISÓDIO' in <strong class='None'>
+Found 'EPISÓDIO' in <strong class='None'>
+Found 'EPISÓDIO' in <strong class='None'>
+Found 'EPISÓDIO' in <strong class='None'>
+Found 'EPISÓDIO' in <strong class='None'>
+Found 'EPISÓDIO' in <strong class='None'>
