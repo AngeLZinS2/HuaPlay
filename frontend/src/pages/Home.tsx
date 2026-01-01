@@ -151,35 +151,35 @@ export default function Home() {
                             </div>
 
                             {/* Content Area */}
-                            <div className="px-8 md:px-12 -mt-32 relative z-10">
-                                <h2 className="text-5xl md:text-6xl font-display font-bold text-white mb-4 drop-shadow-xl loading-none">
+                            <div className="px-4 md:px-12 -mt-20 md:-mt-32 relative z-10 pb-20">
+                                <h2 className="text-3xl md:text-5xl lg:text-6xl font-display font-bold text-white mb-4 drop-shadow-xl leading-tight">
                                     {selectedSeries.title}
                                 </h2>
 
-                                <div className="flex items-center gap-4 mb-8">
+                                <div className="flex flex-wrap items-center gap-3 md:gap-4 mb-8">
                                     <button
                                         onClick={() => handlePlay(selectedSeries.id)}
-                                        className="px-8 py-3 bg-primary text-black font-display font-bold text-lg rounded-sm hover:brightness-110 transition-all shadow-[0_0_15px_rgba(212,175,55,0.4)] flex items-center gap-2"
+                                        className="px-6 py-2 md:px-8 md:py-3 bg-primary text-black font-display font-bold text-base md:text-lg rounded-sm hover:brightness-110 transition-all shadow-[0_0_15px_rgba(212,175,55,0.4)] flex items-center gap-2 flex-grow md:flex-grow-0 justify-center"
                                     >
                                         <Play className="w-5 h-5 fill-black" /> ASSISTIR
                                     </button>
-                                    <button className="p-3 border border-white/20 rounded-sm text-gray-300 hover:border-primary hover:text-primary transition-all bg-black/40 backdrop-blur-sm">
-                                        <Plus className="w-6 h-6" />
+                                    <button className="p-2 md:p-3 border border-white/20 rounded-sm text-gray-300 hover:border-primary hover:text-primary transition-all bg-black/40 backdrop-blur-sm">
+                                        <Plus className="w-5 h-5 md:w-6 md:h-6" />
                                     </button>
-                                    <button className="p-3 border border-white/20 rounded-sm text-gray-300 hover:border-primary hover:text-primary transition-all bg-black/40 backdrop-blur-sm">
-                                        <ThumbsUp className="w-6 h-6" />
+                                    <button className="p-2 md:p-3 border border-white/20 rounded-sm text-gray-300 hover:border-primary hover:text-primary transition-all bg-black/40 backdrop-blur-sm">
+                                        <ThumbsUp className="w-5 h-5 md:w-6 md:h-6" />
                                     </button>
                                     {selectedSeries.trailer_url && (
                                         <button
                                             onClick={() => setIsMuted(!isMuted)}
-                                            className="ml-auto p-3 border border-white/20 rounded-full text-gray-300 hover:text-white bg-black/40 backdrop-blur-sm"
+                                            className="ml-auto p-2 md:p-3 border border-white/20 rounded-full text-gray-300 hover:text-white bg-black/40 backdrop-blur-sm"
                                         >
-                                            {isMuted ? <VolumeX className="w-6 h-6" /> : <Volume2 className="w-6 h-6" />}
+                                            {isMuted ? <VolumeX className="w-5 h-5 md:w-6 md:h-6" /> : <Volume2 className="w-5 h-5 md:w-6 md:h-6" />}
                                         </button>
                                     )}
                                 </div>
 
-                                <div className="grid grid-cols-1 md:grid-cols-[2fr_1fr] gap-12 mb-12">
+                                <div className="grid grid-cols-1 md:grid-cols-[2fr_1fr] gap-8 md:gap-12 mb-12">
                                     <div className="space-y-6">
                                         <div className="flex items-center gap-4 text-sm font-medium">
                                             <span className="text-primary">98% Match</span>
@@ -187,11 +187,11 @@ export default function Home() {
                                             <span className="border border-white/20 px-2 py-0.5 rounded text-xs text-gray-300">HD</span>
                                             <span className="border border-white/20 px-2 py-0.5 rounded text-xs text-gray-300">Legendado</span>
                                         </div>
-                                        <p className="text-gray-300 text-lg leading-relaxed font-light">
+                                        <p className="text-gray-300 text-base md:text-lg leading-relaxed font-light">
                                             {selectedSeries.description}
                                         </p>
                                     </div>
-                                    <div className="space-y-4 text-sm border-l border-white/10 pl-8">
+                                    <div className="space-y-4 text-sm border-l border-white/10 pl-6 md:pl-8">
                                         <div>
                                             <span className="block text-gray-500 mb-1">Elenco</span>
                                             <span className="text-gray-200">{selectedSeries.cast}</span>
@@ -208,9 +208,9 @@ export default function Home() {
                                 </div>
 
                                 {/* Episodes Section */}
-                                <div className="border-t border-white/10 pt-10 pb-20">
-                                    <h3 className="text-2xl font-display font-bold text-white mb-6 flex items-center gap-3">
-                                        <span className="h-8 w-1 bg-primary rounded-full" />
+                                <div className="border-t border-white/10 pt-10 pb-10">
+                                    <h3 className="text-xl md:text-2xl font-display font-bold text-white mb-6 flex items-center gap-3">
+                                        <span className="h-6 w-1 md:h-8 bg-primary rounded-full" />
                                         Episódios
                                     </h3>
 
@@ -219,36 +219,36 @@ export default function Home() {
                                             <div
                                                 key={ep.id}
                                                 onClick={() => handlePlay(selectedSeries.id)}
-                                                className="group flex items-center gap-6 p-4 rounded-lg hover:bg-white/5 border border-transparent hover:border-white/10 transition-all cursor-pointer"
+                                                className="group flex items-center gap-4 md:gap-6 p-3 md:p-4 rounded-lg hover:bg-white/5 border border-transparent hover:border-white/10 transition-all cursor-pointer"
                                             >
-                                                <span className="text-2xl font-display font-bold text-gray-600 group-hover:text-primary transition-colors w-8">
+                                                <span className="text-xl md:text-2xl font-display font-bold text-gray-600 group-hover:text-primary transition-colors min-w-[2rem]">
                                                     {String(index + 1).padStart(2, '0')}
                                                 </span>
-                                                <div className="w-40 aspect-video bg-gray-900 rounded-sm overflow-hidden relative shadow-lg">
+                                                <div className="w-32 md:w-40 aspect-video bg-gray-900 rounded-sm overflow-hidden relative shadow-lg flex-shrink-0">
                                                     <img
                                                         src={selectedSeries.banner || selectedSeries.image}
                                                         alt={ep.title}
                                                         className="w-full h-full object-cover opacity-60 group-hover:opacity-100 group-hover:scale-110 transition-all duration-700"
                                                     />
                                                     <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/40">
-                                                        <Play className="w-8 h-8 fill-white text-white drop-shadow-lg" />
+                                                        <Play className="w-6 h-6 md:w-8 md:h-8 fill-white text-white drop-shadow-lg" />
                                                     </div>
                                                 </div>
                                                 <div className="flex-1 min-w-0">
-                                                    <div className="flex justify-between items-baseline mb-2">
-                                                        <h4 className="text-lg font-bold text-white group-hover:text-primary transition-colors truncate pr-4">
+                                                    <div className="flex justify-between items-baseline mb-1 md:mb-2">
+                                                        <h4 className="text-base md:text-lg font-bold text-white group-hover:text-primary transition-colors truncate pr-2">
                                                             {ep.title}
                                                         </h4>
-                                                        <span className="text-xs text-gray-500 font-mono">45m</span>
+                                                        <span className="text-xs text-gray-500 font-mono hidden sm:block">45m</span>
                                                     </div>
-                                                    <p className="text-gray-400 text-sm line-clamp-2 font-light">
+                                                    <p className="text-gray-400 text-xs md:text-sm line-clamp-2 font-light">
                                                         {selectedSeries.description.substring(0, 120)}...
                                                     </p>
                                                 </div>
                                             </div>
                                         ))}
                                         {modalEpisodes.length === 0 && (
-                                            <div className="text-gray-500 py-8 text-center borderBorder border-dashed border-white/10 rounded-lg">
+                                            <div className="text-gray-500 py-8 text-center border border-dashed border-white/10 rounded-lg">
                                                 Nenhum episódio disponível no momento.
                                             </div>
                                         )}

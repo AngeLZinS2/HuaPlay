@@ -64,6 +64,34 @@ export default function Hero() {
         );
     }
 
+    const getEmbedUrl = (url: string) => {
+        try {
+            if (!url) return '';
+            let videoId = '';
+
+            // Handle youtube.com/watch?v=ID
+            const matchV = url.match(/[?&]v=([^&]+)/);
+            if (matchV) {
+                videoId = matchV[1];
+            }
+            // Handle youtube.com/embed/ID
+            else if (url.includes('/embed/')) {
+                videoId = url.split('/embed/')[1].split('?')[0];
+            }
+            // Handle youtu.be/ID
+            else if (url.includes('youtu.be/')) {
+                videoId = url.split('youtu.be/')[1].split('?')[0];
+            }
+
+            if (!videoId) return url; // Fallback to original if ID extraction fails (or maybe return null?)
+
+            return `https://www.youtube.com/embed/${videoId}?enablejsapi=1&autoplay=1&mute=1&controls=0&modestbranding=1&loop=1&playlist=${videoId}&vq=hd1080&playsinline=1&origin=${window.location.origin}`;
+        } catch (e) {
+            console.error("Error parsing YouTube URL:", e);
+            return url;
+        }
+    };
+
     return (
         <div className="relative h-screen w-full overflow-hidden">
             {/* Background Video/Image */}
@@ -72,10 +100,11 @@ export default function Hero() {
                     <div className="relative w-full h-full overflow-hidden">
                         <iframe
                             ref={iframeRef}
-                            src={`${featured.trailer_url}?enablejsapi=1&autoplay=1&mute=1&controls=0&modestbranding=1&loop=1&playlist=${featured.trailer_url.split('/').pop()}&vq=hd1080`}
+                            src={getEmbedUrl(featured.trailer_url)}
                             className="absolute top-1/2 left-1/2 w-[150vw] h-[150vh] -translate-x-1/2 -translate-y-1/2 pointer-events-none object-cover"
                             frameBorder="0"
                             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                            allowFullScreen
                         />
                     </div>
                 ) : (
@@ -93,12 +122,12 @@ export default function Hero() {
             </div>
 
             {/* Content */}
-            <div className="relative h-full w-full px-12 md:px-20 lg:px-24 flex items-center pt-32">
+            <div className="relative h-full w-full px-6 md:px-12 lg:px-20 flex items-center pt-16 md:pt-20 lg:pt-24 pb-12">
                 <motion.div
                     initial={{ opacity: 0, y: 50 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.8, delay: 0.2 }}
-                    className="max-w-3xl space-y-8"
+                    className="max-w-4xl space-y-4 md:space-y-6 lg:space-y-8"
                 >
                     <motion.div
                         initial={{ opacity: 0, x: -20 }}
@@ -106,51 +135,51 @@ export default function Hero() {
                         transition={{ delay: 0.5 }}
                         className="flex items-center gap-3 mb-4"
                     >
-                        <div className="h-[2px] w-12 bg-primary"></div>
-                        <span className="text-primary font-display font-bold tracking-[0.2em] text-sm uppercase glow-text">
+                        <div className="h-[2px] w-8 md:w-12 bg-primary"></div>
+                        <span className="text-primary font-display font-bold tracking-[0.2em] text-xs md:text-sm uppercase glow-text">
                             Destaque Semanal
                         </span>
                     </motion.div>
 
-                    <h1 className="text-6xl md:text-8xl font-display font-bold leading-none text-transparent bg-clip-text bg-gradient-to-b from-white to-gray-400 drop-shadow-2xl">
+                    <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl xl:text-7xl font-display font-bold leading-none text-transparent bg-clip-text bg-gradient-to-b from-white to-gray-400 drop-shadow-2xl max-w-4xl">
                         {featured.title}
                     </h1>
 
-                    <div className="flex items-center gap-6 text-gray-200 font-sans text-lg tracking-wide border-l-2 border-primary pl-4">
+                    <div className="flex items-center gap-3 md:gap-6 text-gray-200 font-sans text-sm md:text-lg tracking-wide border-l-2 border-primary pl-4">
                         <span className="text-primary font-bold">98% Match</span>
                         <span>{featured.release_year}</span>
                         <span className="px-2 py-0.5 border border-white/20 rounded text-xs bg-black/40 backdrop-blur-sm">{featured.status}</span>
                         <span className="px-2 py-0.5 border border-white/20 rounded text-xs bg-black/40 backdrop-blur-sm">HD</span>
                     </div>
 
-                    <p className="text-gray-300 text-lg max-w-2xl line-clamp-3 font-light leading-relaxed drop-shadow-md">
+                    <p className="text-gray-300 text-sm md:text-lg max-w-xl md:max-w-2xl line-clamp-3 font-light leading-relaxed drop-shadow-md">
                         {featured.description || "Uma história envolvente que vai prender sua atenção do início ao fim. Descubra os segredos e emoções desta incrível produção asiática."}
                     </p>
 
-                    <div className="flex flex-wrap items-center gap-5 pt-6">
+                    <div className="flex flex-wrap items-center gap-4 pt-4 md:pt-6">
                         <motion.button
                             whileHover={{ scale: 1.05, textShadow: "0 0 8px rgba(212, 175, 55, 0.5)" }}
                             whileTap={{ scale: 0.95 }}
                             onClick={() => navigate(`/series/${featured.slug || featured.id}`)}
-                            className="group flex items-center gap-3 px-10 py-4 bg-gradient-to-r from-primary to-[#b8860b] text-black rounded-sm font-display font-bold text-xl hover:brightness-110 transition-all shadow-[0_0_20px_rgba(212,175,55,0.3)]"
+                            className="group flex items-center gap-2 md:gap-3 px-6 py-3 md:px-10 md:py-4 bg-gradient-to-r from-primary to-[#b8860b] text-black rounded-sm font-display font-bold text-base md:text-xl hover:brightness-110 transition-all shadow-[0_0_20px_rgba(212,175,55,0.3)] w-full md:w-auto justify-center"
                         >
-                            <Play className="w-6 h-6 fill-black group-hover:fill-current transition-colors" />
+                            <Play className="w-5 h-5 md:w-6 md:h-6 fill-black group-hover:fill-current transition-colors" />
                             ASSISTIR AGORA
                         </motion.button>
 
                         <motion.button
                             whileHover={{ scale: 1.05, borderColor: "#D4AF37", color: "#D4AF37" }}
                             whileTap={{ scale: 0.95 }}
-                            className="flex items-center gap-3 px-8 py-4 border border-white/30 bg-black/40 backdrop-blur-md text-white rounded-sm font-display font-bold text-xl transition-all hover:bg-black/60"
+                            className="flex items-center gap-2 md:gap-3 px-6 py-3 md:px-8 md:py-4 border border-white/30 bg-black/40 backdrop-blur-md text-white rounded-sm font-display font-bold text-base md:text-xl transition-all hover:bg-black/60 w-full md:w-auto justify-center"
                         >
-                            <Plus className="w-6 h-6" />
+                            <Plus className="w-5 h-5 md:w-6 md:h-6" />
                             MINHA LISTA
                         </motion.button>
 
                         {featured.trailer_url && (
                             <button
                                 onClick={() => setIsMuted(!isMuted)}
-                                className="p-4 border border-white/10 rounded-full text-gray-400 hover:text-primary hover:border-primary/50 bg-black/60 backdrop-blur-md transition-all ml-auto md:ml-4"
+                                className="hidden md:block p-4 border border-white/10 rounded-full text-gray-400 hover:text-primary hover:border-primary/50 bg-black/60 backdrop-blur-md transition-all ml-auto"
                             >
                                 {isMuted ? <VolumeX className="w-6 h-6" /> : <Volume2 className="w-6 h-6" />}
                             </button>

@@ -35,7 +35,7 @@ export default function SeriesCard({ item, onOpenModal, isFirst, isLast }: Serie
 
     return (
         <div
-            className="group relative flex-none w-[200px] h-[300px] z-[0] hover:z-[999]" // Wrapper maintains layout size
+            className="group relative flex-none w-[140px] md:w-[200px] h-[210px] md:h-[300px] z-[0] hover:z-[999]" // Wrapper maintains layout size
             onMouseEnter={() => setIsHovered(true)}
             onMouseLeave={() => setIsHovered(false)}
         >

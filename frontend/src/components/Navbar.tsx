@@ -63,13 +63,13 @@ export default function Navbar() {
                             className="h-10 w-auto object-contain rounded-full shadow-lg group-hover:scale-105 transition-transform duration-300"
                         />
                         <div className="flex items-center">
-                            <span className="text-2xl font-display font-bold text-primary tracking-wider">Hua</span>
-                            <span className="text-2xl font-display font-bold text-white tracking-widest ml-1">Play</span>
+                            <span className="text-lg md:text-xl lg:text-2xl font-display font-bold text-primary tracking-wider">Hua</span>
+                            <span className="text-lg md:text-xl lg:text-2xl font-display font-bold text-white tracking-widest ml-1">Play</span>
                         </div>
                     </Link>
 
                     {/* Desktop Menu */}
-                    <div className="hidden md:flex items-center space-x-6 flex-1 justify-center">
+                    <div className="hidden md:flex items-center space-x-2 lg:space-x-6 flex-1 justify-center">
                         {navigation.map((item) => (
                             <div
                                 key={item.name}
@@ -79,10 +79,10 @@ export default function Navbar() {
                             >
                                 <Link
                                     to={item.href}
-                                    className="flex items-center gap-1 text-sm font-semibold tracking-wide text-gray-300 hover:text-primary transition-colors py-2 uppercase"
+                                    className="flex items-center gap-1 text-[10px] lg:text-sm font-semibold tracking-wide text-gray-300 hover:text-primary transition-colors py-2 uppercase whitespace-nowrap"
                                 >
                                     {item.name}
-                                    {item.dropdown && <ChevronDown className="w-4 h-4" />}
+                                    {item.dropdown && <ChevronDown className="w-3 h-3 lg:w-4 lg:h-4" />}
                                 </Link>
 
                                 {/* Dropdown */}
@@ -103,7 +103,6 @@ export default function Navbar() {
                                                         className="px-4 py-3 text-sm font-medium hover:bg-gray-100 flex justify-between items-center group/item transition-colors"
                                                     >
                                                         {subItem.name}
-                                                        {/* Optional arrow for sub-items if desired, user image had small arrow */}
                                                         <span className="opacity-0 group-hover/item:opacity-100 transition-opacity text-primary">›</span>
                                                     </Link>
                                                 ))}
@@ -148,36 +147,65 @@ export default function Navbar() {
                 </div>
             </div>
 
-            {/* Mobile Menu (Simplified for now, can expand later) */}
+            {/* Mobile Menu */}
             <AnimatePresence>
                 {isMobileMenuOpen && (
                     <motion.div
-                        initial={{ opacity: 0, y: -20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -20 }}
-                        className="md:hidden bg-surface border-t border-gray-800"
+                        initial={{ opacity: 0, x: '100%' }}
+                        animate={{ opacity: 1, x: 0 }}
+                        exit={{ opacity: 0, x: '100%' }}
+                        transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+                        className="fixed inset-0 z-40 md:hidden bg-black/95 backdrop-blur-xl h-[100dvh] overflow-y-auto"
                     >
-                        <div className="px-4 pt-2 pb-4 space-y-1 h-[80vh] overflow-y-auto">
-                            {navigation.map((item) => (
-                                <div key={item.name}>
-                                    <Link to={item.href} className="block px-3 py-2 text-base font-bold text-white hover:bg-gray-800 rounded-md">
+                        <div className="flex flex-col pt-6 px-6 space-y-6 pb-32">
+                            <div className="flex justify-between items-center mb-8">
+                                <span className="text-xl font-display font-bold text-primary">MENU</span>
+                                <button
+                                    onClick={() => setIsMobileMenuOpen(false)}
+                                    className="p-2 border border-white/20 rounded-full text-white hover:bg-white/10"
+                                >
+                                    <X className="w-6 h-6" />
+                                </button>
+                            </div>
+                            {navigation.map((item, idx) => (
+                                <motion.div
+                                    key={item.name}
+                                    initial={{ opacity: 0, x: 20 }}
+                                    animate={{ opacity: 1, x: 0 }}
+                                    transition={{ delay: 0.1 + idx * 0.05 }}
+                                >
+                                    <Link
+                                        to={item.href}
+                                        className="text-2xl font-display font-bold text-white hover:text-primary transition-colors block mb-2"
+                                        onClick={() => setIsMobileMenuOpen(false)}
+                                    >
                                         {item.name}
                                     </Link>
+
                                     {item.dropdown && (
-                                        <div className="pl-6 space-y-1 border-l-2 border-gray-800 ml-3">
+                                        <div className="grid grid-cols-2 gap-3 pl-4 border-l border-white/10 mt-2">
                                             {item.dropdown.map((subItem: any) => (
                                                 <Link
                                                     key={subItem.name}
                                                     to={subItem.href}
-                                                    className="block px-3 py-2 text-sm text-gray-400 hover:text-white hover:bg-gray-800 rounded-md"
+                                                    className="text-sm text-gray-400 hover:text-white transition-colors py-1"
+                                                    onClick={() => setIsMobileMenuOpen(false)}
                                                 >
                                                     {subItem.name}
                                                 </Link>
                                             ))}
                                         </div>
                                     )}
-                                </div>
+                                </motion.div>
                             ))}
+                            <div className="pt-6 border-t border-white/10 flex gap-4">
+                                <Link to="/login" className="px-6 py-2 border border-white/20 rounded-full text-white hover:bg-white hover:text-black transition-all">
+                                    Login
+                                </Link>
+                                <Link to="/register" className="px-6 py-2 bg-primary text-black font-bold rounded-full hover:brightness-110 transition-all">
+                                    Cadastrar
+                                </Link>
+                            </div>
                         </div>
                     </motion.div>
                 )}

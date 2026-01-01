@@ -103,33 +103,34 @@ export default function SeriesDetail() {
     return (
         <div className="min-h-screen pb-20">
             {/* Cinematic Banner */}
-            <div className="relative h-[60vh] w-full">
+            <div className="relative min-h-[85vh] md:min-h-[75vh] w-full flex items-end pt-28">
                 <div
                     className="absolute inset-0 bg-cover bg-center"
                     style={{ backgroundImage: `url(${series.banner_image || series.cover_image})` }}
                 >
                     <div className="absolute inset-0 bg-gradient-to-t from-background via-background/60 to-transparent" />
+                    <div className="absolute top-0 left-0 right-0 h-40 bg-gradient-to-b from-black/90 via-black/50 to-transparent z-10" />
                 </div>
 
-                <div className="absolute bottom-0 left-0 right-0 p-8 max-w-7xl mx-auto flex flex-col md:flex-row gap-8 items-end">
+                <div className="relative z-20 w-full max-w-7xl mx-auto p-6 md:p-8 flex flex-col md:flex-row gap-8 items-end">
                     <motion.img
                         initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}
                         src={series.cover_image}
                         alt={series.title}
-                        className="w-48 rounded-lg shadow-2xl hidden md:block"
+                        className="w-48 lg:w-64 rounded-lg shadow-2xl hidden md:block"
                     />
 
                     <div className="space-y-4 mb-4">
                         <motion.h1
                             initial={{ opacity: 0, x: -20 }}
                             animate={{ opacity: 1, x: 0 }}
-                            className="text-4xl md:text-6xl font-bold text-white"
+                            className="text-3xl md:text-5xl lg:text-7xl font-bold text-white leading-tight"
                         >
                             {series.title}
                         </motion.h1>
 
-                        <div className="flex flex-wrap gap-4 text-sm text-gray-300">
+                        <div className="flex flex-wrap gap-4 text-xs md:text-sm text-gray-300">
                             {/* Static rating for now as it's not in DB yet, or use defaults */}
                             <span className="flex items-center gap-1 text-green-400"><Star className="w-4 h-4 fill-current" /> 9.8</span>
                             <span>{series.release_year}</span>
@@ -137,7 +138,7 @@ export default function SeriesDetail() {
                             <span>{series.country}</span>
                         </div>
 
-                        <p className="max-w-2xl text-gray-300 leading-relaxed md:line-clamp-3">
+                        <p className="max-w-2xl text-gray-300 leading-relaxed line-clamp-4 md:line-clamp-none text-sm md:text-base">
                             {series.description}
                         </p>
 
@@ -173,8 +174,7 @@ export default function SeriesDetail() {
                         <div className="text-gray-400">Nenhum episódio disponível.</div>
                     )}
 
-                    <div className="flex flex-wrap gap-4 bg-surface p-4 rounded-lg">
-                        {/* Play Actions (Instead of Download) */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 bg-surface p-4 rounded-lg">
                         {/* Play Actions (Instead of Download) */}
                         {selectedEpisode?.drive_link && (
                             <button
@@ -182,18 +182,18 @@ export default function SeriesDetail() {
                                     setUseAlternativeLink(false);
                                     setActiveSource(transformToEmbed(selectedEpisode.drive_link, 'drive'));
                                 }}
-                                className={`flex items-center gap-2 px-6 py-3 rounded-sm transition-all font-display font-medium tracking-wide ${activeSource.includes('drive.google')
+                                className={`flex items-center justify-center gap-2 px-4 py-3 rounded-sm transition-all font-display font-medium tracking-wide w-full ${activeSource.includes('drive.google')
                                     ? 'bg-primary text-black shadow-[0_0_15px_rgba(212,175,55,0.4)] font-bold'
                                     : 'bg-white/5 border border-white/10 hover:border-primary/50 hover:bg-white/10 text-gray-300 hover:text-primary'
                                     }`}
                             >
                                 <Play className={`w-4 h-4 ${activeSource.includes('drive.google') ? 'fill-black' : 'fill-current'}`} />
-                                ASSITIR NO DRIVE
+                                DRIVE
                             </button>
                         )}
                         {selectedEpisode?.mega_link && (
                             <a href={selectedEpisode.mega_link} target="_blank" rel="noopener noreferrer"
-                                className="flex items-center gap-2 px-6 py-3 bg-white/5 border border-white/10 hover:border-red-500/50 hover:bg-red-500/10 text-gray-300 hover:text-red-400 rounded-sm transition-all font-display font-medium tracking-wide">
+                                className="flex items-center justify-center gap-2 px-4 py-3 bg-white/5 border border-white/10 hover:border-red-500/50 hover:bg-red-500/10 text-gray-300 hover:text-red-400 rounded-sm transition-all font-display font-medium tracking-wide w-full">
                                 <Download className="w-4 h-4" /> MEGA
                             </a>
                         )}
@@ -203,7 +203,7 @@ export default function SeriesDetail() {
                                     setUseAlternativeLink(false);
                                     setActiveSource(transformToEmbed(selectedEpisode.pixeldrain_link, 'pixeldrain'));
                                 }}
-                                className={`flex items-center gap-2 px-6 py-3 rounded-sm transition-all font-display font-medium tracking-wide ${activeSource.includes('pixeldrain')
+                                className={`flex items-center justify-center gap-2 px-4 py-3 rounded-sm transition-all font-display font-medium tracking-wide w-full ${activeSource.includes('pixeldrain')
                                     ? 'bg-[#F69220] text-black shadow-[0_0_15px_rgba(246,146,32,0.4)] font-bold'
                                     : 'bg-white/5 border border-white/10 hover:border-[#F69220]/50 hover:bg-[#F69220]/10 text-gray-300 hover:text-[#F69220]'
                                     }`}
@@ -218,7 +218,7 @@ export default function SeriesDetail() {
                                     setUseAlternativeLink(false);
                                     setActiveSource(transformToEmbed(selectedEpisode.youtube_link, 'youtube'));
                                 }}
-                                className={`flex items-center gap-2 px-6 py-3 rounded-sm transition-all font-display font-medium tracking-wide ${activeSource.includes('youtube')
+                                className={`flex items-center justify-center gap-2 px-4 py-3 rounded-sm transition-all font-display font-medium tracking-wide w-full ${activeSource.includes('youtube')
                                     ? 'bg-[#FF0000] text-white shadow-[0_0_15px_rgba(255,0,0,0.4)] font-bold'
                                     : 'bg-white/5 border border-white/10 hover:border-[#FF0000]/50 hover:bg-[#FF0000]/10 text-gray-300 hover:text-[#FF0000]'
                                     }`}
@@ -231,14 +231,14 @@ export default function SeriesDetail() {
                         {/* Mediafire - Always Download */}
                         {selectedEpisode?.mediafire_link && (
                             <a href={selectedEpisode.mediafire_link} target="_blank" rel="noopener noreferrer"
-                                className="flex items-center gap-2 px-6 py-3 bg-white/5 border border-white/10 hover:border-blue-500/50 hover:bg-blue-500/10 text-gray-300 hover:text-blue-400 rounded-sm transition-all font-display font-medium tracking-wide ml-auto">
+                                className="flex items-center justify-center gap-2 px-4 py-3 bg-white/5 border border-white/10 hover:border-blue-500/50 hover:bg-blue-500/10 text-gray-300 hover:text-blue-400 rounded-sm transition-all font-display font-medium tracking-wide w-full">
                                 <Download className="w-4 h-4" /> MEDIAFIRE
                             </a>
                         )}
 
                         {/* Generic Download Fallback */}
                         {!selectedEpisode?.drive_link && !selectedEpisode?.mega_link && !selectedEpisode?.mediafire_link && !selectedEpisode?.pixeldrain_link && selectedEpisode?.download_link && (
-                            <a href={selectedEpisode.download_link} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-gray-400 hover:text-white transition-colors">
+                            <a href={selectedEpisode.download_link} target="_blank" rel="noopener noreferrer" className="flex items-center justify-center gap-2 text-gray-400 hover:text-white transition-colors w-full p-3">
                                 <Download className="w-4 h-4" /> Download
                             </a>
                         )}
@@ -251,7 +251,7 @@ export default function SeriesDetail() {
                                     if (!useAlternativeLink) setActiveSource(selectedEpisode.embed_url_2);
                                     else setActiveSource(selectedEpisode.embed_url_1 || '');
                                 }}
-                                className={`ml-auto flex items-center gap-2 px-3 py-1.5 rounded-lg transition-colors text-sm ${useAlternativeLink
+                                className={`col-span-full mt-2 flex items-center justify-center gap-2 px-3 py-1.5 rounded-lg transition-colors text-sm w-full ${useAlternativeLink
                                     ? 'bg-primary text-white'
                                     : 'text-gray-400 hover:text-white hover:bg-white/10'
                                     }`}

@@ -40,7 +40,7 @@ export default function SeriesRow({ title, series, onOpenModal }: SeriesRowProps
 
                 <div
                     ref={rowRef}
-                    className="flex items-center space-x-2.5 overflow-x-scroll scrollbar-hide md:space-x-3.5 pb-20 pt-16 pl-4"
+                    className="flex items-center space-x-2.5 overflow-x-scroll scrollbar-hide md:space-x-3.5 pb-10 pt-8 md:pb-20 md:pt-16 pl-4"
                     style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
                 >
                     {series.map((item, index) => (
