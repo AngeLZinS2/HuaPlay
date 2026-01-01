@@ -21,6 +21,7 @@ class SeriesBase(BaseModel):
     status: str
     release_year: int
     trailer_url: Optional[str] = None
+    feature_type: Optional[str] = "TRAILER"
     cast: Optional[str] = None
     
     drive_link: Optional[str] = None
@@ -53,6 +54,7 @@ class EpisodeBase(BaseModel):
     mega_link: Optional[str] = None
     mediafire_link: Optional[str] = None
     pixeldrain_link: Optional[str] = None
+    youtube_link: Optional[str] = None
 
 class EpisodeCreate(EpisodeBase):
     pass

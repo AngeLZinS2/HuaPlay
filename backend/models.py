@@ -34,6 +34,7 @@ class Series(Base):
     status = Column(String) # Ongoing, Completed
     release_year = Column(Integer)
     trailer_url = Column(String, nullable=True) # YouTube/Embed URL
+    feature_type = Column(String, default="TRAILER") # 'TRAILER' or 'BANNER'
     cast = Column(String, nullable=True) # Comma-separated list of actors
     
     # Download Links
@@ -69,6 +70,7 @@ class Episode(Base):
     mega_link = Column(String, nullable=True)
     mediafire_link = Column(String, nullable=True)
     pixeldrain_link = Column(String, nullable=True)
+    youtube_link = Column(String, nullable=True)
 
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 

@@ -278,8 +278,8 @@ def import_category(url, gender):
 
 def save_series(cursor, series_data):
     try:
-        # Check for duplicates by title
-        cursor.execute("SELECT id FROM series WHERE title = ?", (series_data['title'],))
+        # Check for duplicates by title (case-insensitive)
+        cursor.execute("SELECT id FROM series WHERE LOWER(title) = LOWER(?)", (series_data['title'],))
         row = cursor.fetchone()
         
         if row:
@@ -338,14 +338,14 @@ def save_series(cursor, series_data):
                 if ep_row:
                     cursor.execute("""
                         UPDATE episodes SET 
-                            title = ?, drive_link = ?, mega_link = ?, mediafire_link = ?, pixeldrain_link = ? 
+                            title = ?, drive_link = ?, mega_link = ?, mediafire_link = ?, pixeldrain_link = ?, youtube_link = ?
                         WHERE id = ?
-                    """, (ep['title'], ep['drive_link'], ep['mega_link'], ep['mediafire_link'], ep['pixeldrain_link'], ep_row[0]))
+                    """, (ep['title'], ep['drive_link'], ep['mega_link'], ep['mediafire_link'], ep['pixeldrain_link'], ep.get('youtube_link'), ep_row[0]))
                 else:
                     cursor.execute("""
-                        INSERT INTO episodes (series_id, title, episode_number, drive_link, mega_link, mediafire_link, pixeldrain_link, created_at)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                    """, (series_id, ep['title'], ep['number'], ep['drive_link'], ep['mega_link'], ep['mediafire_link'], ep['pixeldrain_link'], datetime.utcnow()))
+                        INSERT INTO episodes (series_id, title, episode_number, drive_link, mega_link, mediafire_link, pixeldrain_link, youtube_link, created_at)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """, (series_id, ep['title'], ep['number'], ep['drive_link'], ep['mega_link'], ep['mediafire_link'], ep['pixeldrain_link'], ep.get('youtube_link'), datetime.utcnow()))
         
         return 1
             
@@ -467,7 +467,7 @@ def scrape_drama_details(url):
             ep_data = {
                 'number': ep_num,
                 'title': f"Episódio {ep_num}",
-                'drive_link': None, 'mega_link': None, 'mediafire_link': None, 'pixeldrain_link': None
+                'drive_link': None, 'mega_link': None, 'mediafire_link': None, 'pixeldrain_link': None, 'youtube_link': None
             }
             
             for l in links:
@@ -483,6 +483,9 @@ def scrape_drama_details(url):
                 elif is_link_type_ep('mega.nz', href, text): ep_data['mega_link'] = href
                 elif is_link_type_ep('mediafire', href, text): ep_data['mediafire_link'] = href
                 elif is_link_type_ep('pixeldrain', href, text) or 'pixeldrain.com' in href: ep_data['pixeldrain_link'] = href
+                elif is_link_type_ep('youtube', href, text) or 'youtu.be' in href: 
+                    print(f"DEBUG: Found YouTube link for ep {ep_num}: {href}")
+                    ep_data['youtube_link'] = href
             
             details['episodes'].append(ep_data)
 
@@ -606,8 +609,8 @@ def import_single_drama(url):
 
 def main():
     print("Starting import...")
-    import_dramas()
-    # import_single_drama("https://weifansub.com.br/2021/03/25/choc-tuc-vo-yeu/")
+    # import_dramas()
+    import_single_drama("https://weifansub.com.br/2025/01/28/age-of-legends/")
     # import_category("https://weifansub.com.br/atrizes/", "Female")
     # import_category("https://weifansub.com.br/atores/", "Male")
     print("Import complete.")

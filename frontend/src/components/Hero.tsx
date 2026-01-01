@@ -68,7 +68,7 @@ export default function Hero() {
         <div className="relative h-screen w-full overflow-hidden">
             {/* Background Video/Image */}
             <div className="absolute inset-0 select-none pointer-events-none">
-                {featured.trailer_url ? (
+                {featured.trailer_url && (featured.feature_type === 'TRAILER' || !featured.feature_type) ? (
                     <div className="relative w-full h-full overflow-hidden">
                         <iframe
                             ref={iframeRef}

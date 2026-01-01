@@ -1,6 +1,7 @@
 from typing import List
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Response
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 import models, schemas
 from database import get_db
 
@@ -9,14 +10,59 @@ router = APIRouter(
     tags=["series"]
 )
 
+@router.get("/stats")
+def get_stats(db: Session = Depends(get_db)):
+    total = db.query(models.Series).count()
+    completed = db.query(models.Series).filter(models.Series.status == "Completo").count()
+    ongoing = db.query(models.Series).filter(models.Series.status == "Em andamento").count()
+    
+    # Simple type aggregation
+    types_query = db.query(models.Series.type, func.count(models.Series.type)).group_by(models.Series.type).all()
+    types = {t[0]: t[1] for t in types_query}
+    
+    return {
+        "total": total,
+        "completed": completed,
+        "ongoing": ongoing,
+        "types": types
+    }
+
 @router.get("/", response_model=List[schemas.Series])
-def read_series(skip: int = 0, limit: int = 100, search: str = None, is_featured: bool = None, db: Session = Depends(get_db)):
+def read_series(
+    response: Response,
+    skip: int = 0, 
+    limit: int = 100, 
+    search: str = None, 
+    is_featured: bool = None,
+    type: str = None,
+    status: str = None,
+    country: str = None,
+    release_year: int = None,
+    genre: str = None,
+    db: Session = Depends(get_db)
+):
     query = db.query(models.Series)
+    
     if search:
         query = query.filter(models.Series.title.ilike(f"%{search}%"))
     if is_featured is not None:
         query = query.filter(models.Series.is_featured == is_featured)
-    series = query.offset(skip).limit(limit).all()
+    if type and type != "All":
+        query = query.filter(models.Series.type == type)
+    if status and status != "All":
+        query = query.filter(models.Series.status == status)
+    if country:
+        query = query.filter(models.Series.country == country)
+    if release_year:
+        query = query.filter(models.Series.release_year == release_year)
+    if genre:
+        query = query.filter(models.Series.genre.ilike(f"%{genre}%"))
+
+    # Get total count for pagination headers
+    total_count = query.count()
+    response.headers["X-Total-Count"] = str(total_count)
+
+    series = query.order_by(models.Series.id.asc()).offset(skip).limit(limit).all()
     return series
 
 @router.post("/{series_id}/feature", response_model=schemas.Series)

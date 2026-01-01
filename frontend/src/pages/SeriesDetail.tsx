@@ -42,7 +42,7 @@ export default function SeriesDetail() {
     }, [id]);
 
     // Helper to transform common file host links to embeddable versions
-    const transformToEmbed = (url: string, type: 'drive' | 'pixeldrain' | 'mega') => {
+    const transformToEmbed = (url: string, type: 'drive' | 'pixeldrain' | 'mega' | 'youtube') => {
         if (!url) return '';
         if (type === 'drive') {
             // Extract ID and force preview
@@ -63,6 +63,17 @@ export default function SeriesDetail() {
         if (type === 'mega') {
             // https://mega.nz/file/ID#KEY -> https://mega.nz/embed/ID#KEY
             if (url.includes('/file/')) return url.replace('/file/', '/embed/');
+            return url;
+        }
+        if (type === 'youtube') {
+            // https://www.youtube.com/watch?v=ID -> https://www.youtube.com/embed/ID
+            // https://youtu.be/ID -> https://www.youtube.com/embed/ID
+            const vParam = url.match(/[?&]v=([^&]+)/);
+            if (vParam && vParam[1]) return `https://www.youtube.com/embed/${vParam[1]}`;
+            if (url.includes('youtu.be/')) {
+                const id = url.split('youtu.be/')[1].split('?')[0];
+                return `https://www.youtube.com/embed/${id}`;
+            }
             return url;
         }
         return url;
@@ -199,6 +210,21 @@ export default function SeriesDetail() {
                             >
                                 <Play className={`w-4 h-4 ${activeSource.includes('pixeldrain') ? 'fill-black' : 'fill-current'}`} />
                                 PIXELDRAIN
+                            </button>
+                        )}
+                        {selectedEpisode?.youtube_link && (
+                            <button
+                                onClick={() => {
+                                    setUseAlternativeLink(false);
+                                    setActiveSource(transformToEmbed(selectedEpisode.youtube_link, 'youtube'));
+                                }}
+                                className={`flex items-center gap-2 px-6 py-3 rounded-sm transition-all font-display font-medium tracking-wide ${activeSource.includes('youtube')
+                                    ? 'bg-[#FF0000] text-white shadow-[0_0_15px_rgba(255,0,0,0.4)] font-bold'
+                                    : 'bg-white/5 border border-white/10 hover:border-[#FF0000]/50 hover:bg-[#FF0000]/10 text-gray-300 hover:text-[#FF0000]'
+                                    }`}
+                            >
+                                <Play className={`w-4 h-4 ${activeSource.includes('youtube') ? 'fill-white' : 'fill-current'}`} />
+                                YOUTUBE
                             </button>
                         )}
 
