@@ -1,41 +1,107 @@
 import { useState, useRef, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Play, Plus, ThumbsUp, ChevronDown } from 'lucide-react';
+import { Play, Plus, Check, ThumbsUp, ChevronDown } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
+import { addToList, removeFromList, likeSeries, unlikeSeries } from '../services/api';
+import { useToast } from '../context/ToastContext';
 
 interface SeriesCardProps {
     item: any;
     onOpenModal: (series: any) => void;
     isFirst?: boolean;
     isLast?: boolean;
+    variant?: 'default' | 'profile';
 }
 
-export default function SeriesCard({ item, onOpenModal, isFirst, isLast }: SeriesCardProps) {
+export default function SeriesCard({ item, onOpenModal, isFirst, isLast, variant = 'default' }: SeriesCardProps) {
     const [isHovered, setIsHovered] = useState(false);
     const [showTrailer, setShowTrailer] = useState(false);
     const timeoutRef = useRef<any>(null);
     const navigate = useNavigate();
+    const { isAuthenticated, myListIds, myLikeIds, updateLists } = useAuth();
+    const { addToast } = useToast();
+
+    // Local optimistic UI state
+    const [isInList, setIsInList] = useState(false);
+    const [isLiked, setIsLiked] = useState(false);
 
     useEffect(() => {
+        if (myListIds) setIsInList(myListIds.includes(item.id));
+        if (myLikeIds) setIsLiked(myLikeIds.includes(item.id));
+    }, [myListIds, myLikeIds, item.id]);
+
+    useEffect(() => {
+        if (variant === 'profile') return; // Disable expansion for profile variant
+
         if (isHovered) {
             timeoutRef.current = setTimeout(() => {
                 setShowTrailer(true);
-            }, 600); // reduced delay slightly for snappier feel
+            }, 600);
         } else {
             clearTimeout(timeoutRef.current);
             setShowTrailer(false);
         }
         return () => clearTimeout(timeoutRef.current);
-    }, [isHovered]);
+    }, [isHovered, variant]);
 
     const handlePlayClick = (e: any) => {
         e.stopPropagation();
         navigate(`/series/${item.slug || item.id}`);
     };
 
+    const handleToggleList = async (e: any) => {
+        e.stopPropagation();
+        if (!isAuthenticated) {
+            addToast('Faça login para adicionar à sua lista', 'error');
+            return;
+        }
+
+        const previousState = isInList;
+        setIsInList(!previousState); // Optimistic
+
+        try {
+            if (previousState) {
+                await removeFromList(item.id);
+                addToast('Removido da sua lista', 'success');
+            } else {
+                await addToList(item.id);
+                addToast('Adicionado à sua lista', 'success');
+            }
+            updateLists(); // Background sync
+        } catch (error) {
+            setIsInList(previousState); // Revert
+            addToast('Erro ao atualizar lista', 'error');
+        }
+    };
+
+    const handleToggleLike = async (e: any) => {
+        e.stopPropagation();
+        if (!isAuthenticated) {
+            addToast('Faça login para curtir', 'error');
+            return;
+        }
+
+        const previousState = isLiked;
+        setIsLiked(!previousState);
+
+        try {
+            if (previousState) {
+                await unlikeSeries(item.id);
+            } else {
+                await likeSeries(item.id);
+                addToast('Marcado como Gostei', 'success');
+            }
+            updateLists();
+        } catch (error) {
+            setIsLiked(previousState);
+            addToast('Erro ao atualizar', 'error');
+        }
+    };
+
     return (
         <div
-            className="group relative flex-none w-[140px] md:w-[200px] h-[210px] md:h-[300px] z-[0] hover:z-[999]" // Wrapper maintains layout size
+            className="group relative flex-none w-[140px] md:w-[200px] h-[210px] md:h-[300px] z-[0] hover:z-[999]"
             onMouseEnter={() => setIsHovered(true)}
             onMouseLeave={() => setIsHovered(false)}
         >
@@ -46,7 +112,7 @@ export default function SeriesCard({ item, onOpenModal, isFirst, isLast }: Serie
                         ? {
                             width: 320,
                             height: 'auto',
-                            top: -25, // Reduced from -50 to keep it closer to the line
+                            top: -25,
                             left: isFirst ? 0 : isLast ? -120 : -60,
                             scale: 1.1,
                             position: 'absolute',
@@ -57,7 +123,7 @@ export default function SeriesCard({ item, onOpenModal, isFirst, isLast }: Serie
                             height: '100%',
                             top: 0,
                             left: 0,
-                            scale: isHovered ? 1.05 : 1,
+                            scale: isHovered && variant !== 'profile' ? 1.05 : 1,
                             position: 'absolute',
                             zIndex: isHovered ? 50 : 0
                         }
@@ -89,15 +155,15 @@ export default function SeriesCard({ item, onOpenModal, isFirst, isLast }: Serie
                     )}
                 </div>
 
-                {/* Info Content - Only shown when expanded */}
+                {/* Info Content - Only shown when expanded or on hover in profile variant */}
                 <motion.div
-                    className="p-4"
+                    className={`p-4 ${variant === 'profile' ? 'absolute inset-0 bg-black/80 flex flex-col justify-center items-center gap-4' : ''}`}
                     initial={{ opacity: 0 }}
-                    animate={showTrailer ? { opacity: 1 } : { opacity: 0 }}
+                    animate={showTrailer || (variant === 'profile' && isHovered) ? { opacity: 1 } : { opacity: 0 }}
                     transition={{ duration: 0.2 }}
                 >
                     {/* Action Buttons */}
-                    <div className="flex items-center justify-between mb-3">
+                    <div className={`flex items-center ${variant === 'profile' ? 'justify-center gap-4 w-full' : 'justify-between mb-3'}`}>
                         <div className="flex items-center gap-2">
                             <button
                                 onClick={handlePlayClick}
@@ -105,34 +171,51 @@ export default function SeriesCard({ item, onOpenModal, isFirst, isLast }: Serie
                             >
                                 <Play className="w-4 h-4 fill-black text-black pl-0.5" />
                             </button>
-                            <button className="w-8 h-8 border-2 border-gray-400 rounded-full flex items-center justify-center text-gray-400 hover:border-white hover:text-white transition-colors">
-                                <Plus className="w-4 h-4" />
+                            <button
+                                onClick={handleToggleList}
+                                className={`w-8 h-8 border-2 rounded-full flex items-center justify-center transition-colors ${isInList
+                                    ? 'border-green-500 bg-green-500/10 text-green-500 hover:bg-green-500/20'
+                                    : 'border-gray-400 text-gray-400 hover:border-white hover:text-white'
+                                    }`}
+                                title={isInList ? "Remover da Lista" : "Adicionar à Lista"}
+                            >
+                                {isInList ? <Check className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
                             </button>
-                            <button className="w-8 h-8 border-2 border-gray-400 rounded-full flex items-center justify-center text-gray-400 hover:border-white hover:text-white transition-colors">
-                                <ThumbsUp className="w-4 h-4" />
+                            <button
+                                onClick={handleToggleLike}
+                                className={`w-8 h-8 border-2 rounded-full flex items-center justify-center transition-colors ${isLiked
+                                    ? 'border-[#E50914] bg-[#E50914]/10 text-[#E50914] hover:bg-[#E50914]/20'
+                                    : 'border-gray-400 text-gray-400 hover:border-white hover:text-white'
+                                    }`}
+                            >
+                                <ThumbsUp className={`w-4 h-4 ${isLiked ? 'fill-current' : ''}`} />
                             </button>
                         </div>
-                        <button
-                            onClick={() => onOpenModal(item)}
-                            className="w-8 h-8 border-2 border-gray-400 rounded-full flex items-center justify-center text-gray-400 hover:border-white hover:text-white transition-colors"
-                        >
-                            <ChevronDown className="w-4 h-4" />
-                        </button>
+                        {variant !== 'profile' && (
+                            <button
+                                onClick={() => onOpenModal(item)}
+                                className="w-8 h-8 border-2 border-gray-400 rounded-full flex items-center justify-center text-gray-400 hover:border-white hover:text-white transition-colors"
+                            >
+                                <ChevronDown className="w-4 h-4" />
+                            </button>
+                        )}
                     </div>
 
-                    {/* Metadata */}
-                    <div>
-                        <h3 className="text-sm font-bold text-white mb-1 line-clamp-1">{item.title}</h3>
-                        <div className="flex items-center gap-2 text-[10px] font-semibold mb-1">
-                            <span className="text-green-500">98% Relevante</span>
-                            <span className="border border-gray-500 px-1 text-gray-400">16</span>
-                            <span className="text-gray-400">{item.duration}</span>
+                    {/* Metadata - Only for default variant */}
+                    {variant !== 'profile' && (
+                        <div>
+                            <h3 className="text-sm font-bold text-white mb-1 line-clamp-1">{item.title}</h3>
+                            <div className="flex items-center gap-2 text-[10px] font-semibold mb-1">
+                                <span className="text-green-500">98% Relevante</span>
+                                <span className="border border-gray-500 px-1 text-gray-400">16</span>
+                                <span className="text-gray-400">{item.duration}</span>
+                            </div>
+                            <div className="flex items-center gap-2 text-[10px] text-white">
+                                <span>{item.genre}</span>
+                                <span className="w-1 h-1 bg-gray-500 rounded-full"></span>
+                            </div>
                         </div>
-                        <div className="flex items-center gap-2 text-[10px] text-white">
-                            <span>{item.genre}</span>
-                            <span className="w-1 h-1 bg-gray-500 rounded-full"></span>
-                        </div>
-                    </div>
+                    )}
                 </motion.div>
             </motion.div>
         </div>

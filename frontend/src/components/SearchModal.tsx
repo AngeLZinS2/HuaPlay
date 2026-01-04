@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, X, Film, Loader2 } from 'lucide-react';
+import { Search, X, Film, Loader2, ChevronDown } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { getSeries, type Series } from '../services/series';
+import { useModal } from '../context/ModalContext';
 
 interface SearchModalProps {
     isOpen: boolean;
@@ -14,6 +15,7 @@ export default function SearchModal({ isOpen, onClose }: SearchModalProps) {
     const [results, setResults] = useState<Series[]>([]);
     const [loading, setLoading] = useState(false);
     const inputRef = useRef<HTMLInputElement>(null);
+    const { openModal } = useModal();
 
     // Focus input when modal opens
     useEffect(() => {
@@ -112,32 +114,55 @@ export default function SearchModal({ isOpen, onClose }: SearchModalProps) {
                                         </h3>
                                         <div className="flex flex-col">
                                             {results.map((series) => (
-                                                <Link
+                                                <div
                                                     key={series.id}
-                                                    to={`/series/${series.id}`}
-                                                    onClick={onClose}
-                                                    className="group flex items-center gap-4 px-6 py-4 hover:bg-white/5 transition-colors border-l-2 border-transparent hover:border-primary"
+                                                    className="group flex items-center gap-4 px-6 py-4 hover:bg-white/5 transition-colors border-l-2 border-transparent hover:border-primary relative cursor-pointer"
                                                 >
-                                                    <div className="relative w-12 h-16 flex-shrink-0 rounded overflow-hidden bg-gray-800">
-                                                        <img
-                                                            src={series.cover_image || '/placeholder-cover.jpg'}
-                                                            alt={series.title}
-                                                            className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
-                                                        />
-                                                    </div>
-                                                    <div className="flex flex-col flex-1 min-w-0">
-                                                        <span className="text-lg font-medium text-white truncate group-hover:text-primary transition-colors">
-                                                            {series.title}
-                                                        </span>
-                                                        <div className="flex items-center gap-2 text-sm text-gray-400">
-                                                            <span>{series.release_year}</span>
-                                                            <span className="w-1 h-1 rounded-full bg-gray-600" />
-                                                            <span>{series.type}</span>
-                                                            <span className="w-1 h-1 rounded-full bg-gray-600" />
-                                                            <span className="truncate">{series.genre}</span>
+                                                    <Link
+                                                        to={`/series/${series.id}`}
+                                                        onClick={onClose}
+                                                        className="flex items-center gap-4 flex-1 min-w-0"
+                                                    >
+                                                        <div className="relative w-12 h-16 flex-shrink-0 rounded overflow-hidden bg-gray-800">
+                                                            <img
+                                                                src={series.cover_image || '/placeholder-cover.jpg'}
+                                                                alt={series.title}
+                                                                className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
+                                                            />
                                                         </div>
-                                                    </div>
-                                                </Link>
+                                                        <div className="flex flex-col flex-1 min-w-0">
+                                                            <span className="text-lg font-medium text-white truncate group-hover:text-primary transition-colors">
+                                                                {series.title}
+                                                            </span>
+                                                            <div className="flex items-center gap-2 text-sm text-gray-400">
+                                                                <span>{series.release_year}</span>
+                                                                <span className="w-1 h-1 rounded-full bg-gray-600" />
+                                                                <span>{series.type}</span>
+                                                                <span className="w-1 h-1 rounded-full bg-gray-600" />
+                                                                <span className="truncate">{series.genre}</span>
+                                                            </div>
+                                                        </div>
+                                                    </Link>
+
+                                                    <button
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            e.preventDefault();
+                                                            onClose();
+                                                            openModal({
+                                                                ...series,
+                                                                image: series.cover_image,
+                                                                description: series.description || "Descrição indisponível",
+                                                                cast: "",
+                                                                moods: ""
+                                                            } as any);
+                                                        }}
+                                                        className="p-2 rounded-full border border-gray-500 text-gray-400 hover:border-white hover:text-white transition-colors z-10"
+                                                        title="Mais informações"
+                                                    >
+                                                        <ChevronDown className="w-5 h-5" />
+                                                    </button>
+                                                </div>
                                             ))}
                                         </div>
                                     </div>

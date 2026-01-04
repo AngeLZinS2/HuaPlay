@@ -20,7 +20,7 @@ def register(user: schemas.UserCreate, db: Session = Depends(get_db)):
     new_user = models.User(
         email=user.email,
         hashed_password=hashed_password,
-        full_name=user.email.split("@")[0] # Default name
+        full_name=user.full_name if user.full_name else user.email.split("@")[0]
     )
     db.add(new_user)
     db.commit()

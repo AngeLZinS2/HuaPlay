@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Search, User, Menu, X, ChevronDown, Moon } from 'lucide-react';
+import { Search, User, Menu, X, ChevronDown, Moon, Edit, Repeat, HelpCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import SearchModal from './SearchModal';
+import { useAuth } from '../context/AuthContext';
 
 const navigation = [
     { name: 'CRONOGRAMA', href: '/schedule' },
@@ -34,6 +35,7 @@ const navigation = [
 ];
 
 export default function Navbar() {
+    const { isAuthenticated, profiles, currentProfile, selectProfile, logout } = useAuth();
     const [isScrolled, setIsScrolled] = useState(false);
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
     const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
@@ -125,14 +127,103 @@ export default function Navbar() {
                         >
                             <Search className="w-5 h-5" />
                         </button>
-                        {/* Optional: Keep User Profile if user wants login access */}
-                        <Link to="/profile" className="flex items-center gap-2 text-gray-300 hover:text-white transition-colors ml-2">
-                            <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-primary to-purple-600 p-[1px]">
-                                <div className="w-full h-full rounded-full bg-surface flex items-center justify-center">
-                                    <User className="w-4 h-4" />
+                        {/* User Profile Dropdown */}
+                        {isAuthenticated ? (
+                            <div
+                                className="relative ml-4 z-50"
+                                onMouseEnter={() => setActiveDropdown('profile')}
+                                onMouseLeave={() => setActiveDropdown(null)}
+                            >
+                                <div className="flex items-center gap-2 cursor-pointer py-2">
+                                    <div className={`w-8 h-8 rounded-md overflow-hidden border transition-colors ${activeDropdown === 'profile' ? 'border-white' : 'border-transparent'}`}>
+                                        <img
+                                            src={currentProfile?.avatar_url || "https://wallpapers.com/images/hd/netflix-profile-pictures-1000-x-1000-qo9h82134t9nv0j0.jpg"}
+                                            alt="Profile"
+                                            className="w-full h-full object-cover"
+                                        />
+                                    </div>
+                                    <ChevronDown className={`w-4 h-4 text-white transition-transform duration-300 ${activeDropdown === 'profile' ? 'rotate-180' : ''}`} />
                                 </div>
+
+                                {/* Dropdown Menu */}
+                                <AnimatePresence>
+                                    {activeDropdown === 'profile' && (
+                                        <motion.div
+                                            initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                                            animate={{ opacity: 1, y: 0, scale: 1 }}
+                                            exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                                            transition={{ duration: 0.2, ease: "easeOut" }}
+                                            className="absolute right-0 top-full pt-2 w-56"
+                                        >
+                                            {/* Up Arrow */}
+                                            <div className="flex justify-end pr-3 mb-[-1px]">
+                                                <div className="w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-b-[8px] border-b-white/10"></div>
+                                            </div>
+
+                                            <div className="bg-black/95 border border-white/10 rounded-sm shadow-2xl overflow-hidden backdrop-blur-sm">
+                                                {/* Other Profiles */}
+                                                <div className="p-3 flex flex-col gap-3">
+                                                    {profiles.filter(p => p.id !== currentProfile?.id).map(profile => (
+                                                        <div
+                                                            key={profile.id}
+                                                            onClick={() => selectProfile(profile)}
+                                                            className="flex items-center gap-3 cursor-pointer group/item"
+                                                        >
+                                                            <img
+                                                                src={profile.avatar_url || "https://wallpapers.com/images/hd/netflix-profile-pictures-1000-x-1000-qo9h82134t9nv0j0.jpg"}
+                                                                alt={profile.name}
+                                                                className="w-8 h-8 rounded-md object-cover opacity-80 group-hover/item:opacity-100"
+                                                            />
+                                                            <span className="text-sm text-gray-300 group-hover/item:text-white group-hover/item:underline transition-colors">{profile.name}</span>
+                                                        </div>
+                                                    ))}
+                                                    <Link to="/profiles" className="flex items-center gap-3 mt-1 text-sm text-gray-300 hover:text-white hover:underline transition-colors pt-2 border-t border-white/10">
+                                                        <Edit className="w-4 h-4" />
+                                                        Gerenciar perfis
+                                                    </Link>
+                                                    <div className="flex items-center gap-3 text-sm text-gray-300 hover:text-white hover:underline transition-colors cursor-not-allowed opacity-50">
+                                                        <Repeat className="w-4 h-4" />
+                                                        Transferir perfil
+                                                    </div>
+                                                    <Link to="/profile" className="flex items-center gap-3 text-sm text-gray-300 hover:text-white hover:underline transition-colors">
+                                                        <User className="w-4 h-4" />
+                                                        Conta
+                                                    </Link>
+                                                    <div className="flex items-center gap-3 text-sm text-gray-300 hover:text-white hover:underline transition-colors cursor-not-allowed opacity-50">
+                                                        <HelpCircle className="w-4 h-4" />
+                                                        Central de Ajuda
+                                                    </div>
+                                                </div>
+
+                                                {/* Logout */}
+                                                <div className="border-t border-white/10 p-3">
+                                                    <button
+                                                        onClick={() => {
+                                                            logout();
+                                                            window.location.href = '/login';
+                                                        }}
+                                                        className="w-full text-center text-xs font-semibold text-white hover:underline"
+                                                    >
+                                                        Sair da HuaPlay
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </motion.div>
+                                    )}
+                                </AnimatePresence>
                             </div>
-                        </Link>
+                        ) : (
+                            <Link
+                                to="/login"
+                                className="flex items-center gap-2 text-gray-300 hover:text-white transition-colors ml-2"
+                            >
+                                <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-primary to-purple-600 p-[1px]">
+                                    <div className="w-full h-full rounded-full bg-surface flex items-center justify-center">
+                                        <User className="w-4 h-4" />
+                                    </div>
+                                </div>
+                            </Link>
+                        )}
                     </div>
 
                     {/* Mobile Menu Button */}

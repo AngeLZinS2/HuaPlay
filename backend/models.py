@@ -9,16 +9,40 @@ class User(Base):
     id = Column(Integer, primary_key=True, index=True)
     email = Column(String, unique=True, index=True)
     hashed_password = Column(String)
+    full_name = Column(String, nullable=True) # Added full_name
     is_active = Column(Boolean, default=True)
     is_admin = Column(Boolean, default=False)
     
-    # Profile info
-    full_name = Column(String, nullable=True)
-    avatar_url = Column(String, nullable=True)
+    # Profile info - Now managed via UserProfile, but keeping basics here optionally or moving them?
+    # Keeping basic user info here, profiles manage their own lists
+    profiles = relationship("UserProfile", back_populates="user")
+    
+    # Relationships now moved to Profile, but we might keep some for legacy or global access?
+    # For now, let's keep them on User for backward compat until migration is done, 
+    # but strictly speaking they should move to UserProfile. 
+    # To follow the plan: "Update existing models ... to reference profile_id"
+    # We will point them to UserProfile.
 
-    watch_history = relationship("WatchHistory", back_populates="user")
-    my_list = relationship("UserList", back_populates="user")
-    likes = relationship("Like", back_populates="user")
+class UserProfile(Base):
+    __tablename__ = "user_profiles"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"))
+    name = Column(String)
+    avatar_url = Column(String, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    user = relationship("User", back_populates="profiles")
+    
+    # Relationships specific to this profile
+    watch_history = relationship("WatchHistory", back_populates="profile")
+    my_list = relationship("UserList", back_populates="profile")
+    likes = relationship("Like", back_populates="profile")
+
+
+# ... Series and Episode classes remain same ...
+
+
 
 class Series(Base):
     __tablename__ = "series"
@@ -81,32 +105,33 @@ class WatchHistory(Base):
     __tablename__ = "watch_history"
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"))
+    profile_id = Column(Integer, ForeignKey("user_profiles.id"))
     episode_id = Column(Integer, ForeignKey("episodes.id"))
     timestamp_seconds = Column(Integer, default=0) # Last watched position
     completed = Column(Boolean, default=False)
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
-    user = relationship("User", back_populates="watch_history")
+    profile = relationship("UserProfile", back_populates="watch_history")
     episode = relationship("Episode", back_populates="watch_history")
 
 class UserList(Base):
     __tablename__ = "user_list"
     
-    user_id = Column(Integer, ForeignKey("users.id"), primary_key=True)
+    # Using profile_id now
+    profile_id = Column(Integer, ForeignKey("user_profiles.id"), primary_key=True)
     series_id = Column(Integer, ForeignKey("series.id"), primary_key=True)
     added_at = Column(DateTime(timezone=True), server_default=func.now())
 
-    user = relationship("User", back_populates="my_list")
+    profile = relationship("UserProfile", back_populates="my_list")
     series = relationship("Series")
 
 class Like(Base):
     __tablename__ = "likes"
 
-    user_id = Column(Integer, ForeignKey("users.id"), primary_key=True)
+    profile_id = Column(Integer, ForeignKey("user_profiles.id"), primary_key=True)
     series_id = Column(Integer, ForeignKey("series.id"), primary_key=True)
 
-    user = relationship("User", back_populates="likes")
+    profile = relationship("UserProfile", back_populates="likes")
     series = relationship("Series", back_populates="likes")
 
 class Actor(Base):

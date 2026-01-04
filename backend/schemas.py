@@ -71,6 +71,7 @@ class UserBase(BaseModel):
 
 class UserCreate(UserBase):
     password: str
+    full_name: Optional[str] = None
 
 class User(UserBase):
     id: int
@@ -98,3 +99,23 @@ class Actor(ActorBase):
     created_at: datetime
     class Config:
         from_attributes = True
+class UserProfileBase(BaseModel):
+    name: str
+    avatar_url: Optional[str] = None
+
+class UserProfileCreate(UserProfileBase):
+    pass
+
+class UserProfileUpdate(BaseModel):
+    name: Optional[str] = None
+    avatar_url: Optional[str] = None
+
+class UserProfile(UserProfileBase):
+    id: int
+    user_id: int
+    created_at: datetime
+    class Config:
+        from_attributes = True
+
+class UserWithProfiles(User):
+    profiles: List[UserProfile] = []

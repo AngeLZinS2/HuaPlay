@@ -1,14 +1,43 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
-import { Play, Plus, Volume2, VolumeX } from 'lucide-react';
+import { Play, Plus, Check, Volume2, VolumeX } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
+import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
 
 export default function Hero() {
     const [featured, setFeatured] = useState<any | null>(null);
+    const [loading, setLoading] = useState(true);
     const [isMuted, setIsMuted] = useState(true);
     const iframeRef = useRef<HTMLIFrameElement>(null);
     const navigate = useNavigate();
+    const { myListIds, updateLists, isAuthenticated } = useAuth();
+    const { addToast } = useToast();
+
+    const isInList = featured ? myListIds.includes(featured.id) : false;
+
+    const handleToggleList = async () => {
+        if (!featured) return;
+        if (!isAuthenticated) {
+            navigate('/login');
+            return;
+        }
+
+        try {
+            if (isInList) {
+                await api.delete(`/users/me/list/${featured.id}`);
+                addToast('Removido da sua lista', 'info');
+            } else {
+                await api.post(`/users/me/list/${featured.id}`);
+                addToast('Adicionado à sua lista', 'success');
+            }
+            await updateLists();
+        } catch (error) {
+            console.error("Failed to update list", error);
+            addToast('Erro ao atualizar lista', 'error');
+        }
+    };
 
     useEffect(() => {
         const fetchFeatured = async () => {
@@ -20,6 +49,8 @@ export default function Hero() {
                 }
             } catch (error) {
                 console.error("Failed to fetch featured series:", error);
+            } finally {
+                setLoading(false);
             }
         };
         fetchFeatured();
@@ -35,6 +66,10 @@ export default function Hero() {
             }), '*');
         }
     }, [isMuted, featured]);
+
+    if (loading) {
+        return <div className="relative h-screen w-full bg-black" />;
+    }
 
     if (!featured) {
         return (
@@ -97,16 +132,28 @@ export default function Hero() {
             {/* Background Video/Image */}
             <div className="absolute inset-0 select-none pointer-events-none">
                 {featured.trailer_url && (featured.feature_type === 'TRAILER' || !featured.feature_type) ? (
-                    <div className="relative w-full h-full overflow-hidden">
-                        <iframe
-                            ref={iframeRef}
-                            src={getEmbedUrl(featured.trailer_url)}
-                            className="absolute top-1/2 left-1/2 w-[150vw] h-[150vh] -translate-x-1/2 -translate-y-1/2 pointer-events-none object-cover"
-                            frameBorder="0"
-                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                            allowFullScreen
-                        />
-                    </div>
+                    <>
+                        {/* Mobile: Show Image Fallback */}
+                        <div className="block md:hidden w-full h-full relative">
+                            <img
+                                src={featured.banner_image || featured.cover_image}
+                                alt={featured.title}
+                                className="w-full h-full object-cover"
+                            />
+                        </div>
+
+                        {/* Desktop: Show Trailer */}
+                        <div className="hidden md:block relative w-full h-full overflow-hidden">
+                            <iframe
+                                ref={iframeRef}
+                                src={getEmbedUrl(featured.trailer_url)}
+                                className="absolute top-1/2 left-1/2 w-[150vw] h-[150vh] -translate-x-1/2 -translate-y-1/2 pointer-events-none object-cover"
+                                frameBorder="0"
+                                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                allowFullScreen
+                            />
+                        </div>
+                    </>
                 ) : (
                     <img
                         src={featured.banner_image || featured.cover_image}
@@ -170,10 +217,11 @@ export default function Hero() {
                         <motion.button
                             whileHover={{ scale: 1.05, borderColor: "#D4AF37", color: "#D4AF37" }}
                             whileTap={{ scale: 0.95 }}
-                            className="flex items-center gap-2 md:gap-3 px-6 py-3 md:px-8 md:py-4 border border-white/30 bg-black/40 backdrop-blur-md text-white rounded-sm font-display font-bold text-base md:text-xl transition-all hover:bg-black/60 w-full md:w-auto justify-center"
+                            onClick={handleToggleList}
+                            className={`flex items-center gap-2 md:gap-3 px-6 py-3 md:px-8 md:py-4 border border-white/30 backdrop-blur-md rounded-sm font-display font-bold text-base md:text-xl transition-all hover:bg-black/60 w-full md:w-auto justify-center ${isInList ? 'bg-primary/20 text-primary border-primary' : 'bg-black/40 text-white'}`}
                         >
-                            <Plus className="w-5 h-5 md:w-6 md:h-6" />
-                            MINHA LISTA
+                            {isInList ? <Check className="w-5 h-5 md:w-6 md:h-6" /> : <Plus className="w-5 h-5 md:w-6 md:h-6" />}
+                            {isInList ? 'NA LISTA' : 'MINHA LISTA'}
                         </motion.button>
 
                         {featured.trailer_url && (
