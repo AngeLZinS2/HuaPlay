@@ -73,9 +73,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             if (storedProfileId) {
                 await updateLists();
             }
-        } catch (error) {
+        } catch (error: any) {
             console.error("Failed to fetch user data", error);
-            // If 401, logout?
+            // If 401/403, invalid token, so logout
+            if (error.response && (error.response.status === 401 || error.response.status === 403)) {
+                logout();
+            }
         } finally {
             setIsLoading(false);
         }

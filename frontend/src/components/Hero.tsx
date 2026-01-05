@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
+import { getYouTubeEmbedUrl, getYouTubeVideoId } from '../utils/youtube';
 
 export default function Hero() {
     const [featured, setFeatured] = useState<any | null>(null);
@@ -99,33 +100,7 @@ export default function Hero() {
         );
     }
 
-    const getEmbedUrl = (url: string) => {
-        try {
-            if (!url) return '';
-            let videoId = '';
 
-            // Handle youtube.com/watch?v=ID
-            const matchV = url.match(/[?&]v=([^&]+)/);
-            if (matchV) {
-                videoId = matchV[1];
-            }
-            // Handle youtube.com/embed/ID
-            else if (url.includes('/embed/')) {
-                videoId = url.split('/embed/')[1].split('?')[0];
-            }
-            // Handle youtu.be/ID
-            else if (url.includes('youtu.be/')) {
-                videoId = url.split('youtu.be/')[1].split('?')[0];
-            }
-
-            if (!videoId) return url; // Fallback to original if ID extraction fails (or maybe return null?)
-
-            return `https://www.youtube.com/embed/${videoId}?enablejsapi=1&autoplay=1&mute=1&controls=0&modestbranding=1&loop=1&playlist=${videoId}&vq=hd1080&playsinline=1&origin=${window.location.origin}`;
-        } catch (e) {
-            console.error("Error parsing YouTube URL:", e);
-            return url;
-        }
-    };
 
     return (
         <div className="relative h-screen w-full overflow-hidden">
@@ -146,11 +121,12 @@ export default function Hero() {
                         <div className="hidden md:block relative w-full h-full overflow-hidden">
                             <iframe
                                 ref={iframeRef}
-                                src={getEmbedUrl(featured.trailer_url)}
+                                src={`${getYouTubeEmbedUrl(featured.trailer_url)}?enablejsapi=1&autoplay=1&mute=1&controls=0&modestbranding=1&loop=1&playlist=${getYouTubeVideoId(featured.trailer_url)}&vq=hd1080&playsinline=1&origin=${encodeURIComponent(window.location.origin)}`}
                                 className="absolute top-1/2 left-1/2 w-[150vw] h-[150vh] -translate-x-1/2 -translate-y-1/2 pointer-events-none object-cover"
                                 frameBorder="0"
                                 allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                                 allowFullScreen
+                                referrerPolicy="strict-origin-when-cross-origin"
                             />
                         </div>
                     </>

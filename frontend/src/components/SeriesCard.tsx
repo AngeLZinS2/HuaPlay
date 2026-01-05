@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { addToList, removeFromList, likeSeries, unlikeSeries } from '../services/api';
 import { useToast } from '../context/ToastContext';
+import { getYouTubeEmbedUrl, getYouTubeVideoId } from '../utils/youtube';
 
 interface SeriesCardProps {
     item: any;
@@ -22,9 +23,17 @@ export default function SeriesCard({ item, onOpenModal, isFirst, isLast, variant
     const { isAuthenticated, myListIds, myLikeIds, updateLists } = useAuth();
     const { addToast } = useToast();
 
+    const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+
     // Local optimistic UI state
     const [isInList, setIsInList] = useState(false);
     const [isLiked, setIsLiked] = useState(false);
+
+    useEffect(() => {
+        const handleResize = () => setIsMobile(window.innerWidth < 768);
+        window.addEventListener('resize', handleResize);
+        return () => window.removeEventListener('resize', handleResize);
+    }, []);
 
     useEffect(() => {
         if (myListIds) setIsInList(myListIds.includes(item.id));
@@ -32,7 +41,7 @@ export default function SeriesCard({ item, onOpenModal, isFirst, isLast, variant
     }, [myListIds, myLikeIds, item.id]);
 
     useEffect(() => {
-        if (variant === 'profile') return; // Disable expansion for profile variant
+        if (variant === 'profile' || isMobile) return; // Disable expansion for profile variant or mobile
 
         if (isHovered) {
             timeoutRef.current = setTimeout(() => {
@@ -43,7 +52,7 @@ export default function SeriesCard({ item, onOpenModal, isFirst, isLast, variant
             setShowTrailer(false);
         }
         return () => clearTimeout(timeoutRef.current);
-    }, [isHovered, variant]);
+    }, [isHovered, variant, isMobile]);
 
     const handlePlayClick = (e: any) => {
         e.stopPropagation();
@@ -102,13 +111,14 @@ export default function SeriesCard({ item, onOpenModal, isFirst, isLast, variant
     return (
         <div
             className="group relative flex-none w-[140px] md:w-[200px] h-[210px] md:h-[300px] z-[0] hover:z-[999]"
-            onMouseEnter={() => setIsHovered(true)}
-            onMouseLeave={() => setIsHovered(false)}
+            onMouseEnter={() => !isMobile && setIsHovered(true)}
+            onMouseLeave={() => !isMobile && setIsHovered(false)}
+            onClick={() => isMobile && onOpenModal(item)}
         >
             <motion.div
                 className="w-full h-full bg-[#181818] rounded-md shadow-xl overflow-hidden origin-center"
                 animate={
-                    showTrailer
+                    showTrailer && !isMobile
                         ? {
                             width: 320,
                             height: 'auto',
@@ -123,34 +133,29 @@ export default function SeriesCard({ item, onOpenModal, isFirst, isLast, variant
                             height: '100%',
                             top: 0,
                             left: 0,
-                            scale: isHovered && variant !== 'profile' ? 1.05 : 1,
+                            scale: isHovered && variant !== 'profile' && !isMobile ? 1.05 : 1,
                             position: 'absolute',
-                            zIndex: isHovered ? 50 : 0
+                            zIndex: isHovered && !isMobile ? 50 : 0
                         }
                 }
                 transition={{ duration: 0.3, ease: 'easeInOut' }}
             >
                 {/* Media Container */}
-                <div className={`relative w-full ${showTrailer ? 'aspect-video' : 'h-full'} bg-black transition-all duration-300 overflow-hidden`}>
-                    {showTrailer && item.trailer_url ? (
+                <div className={`relative w-full ${showTrailer && !isMobile ? 'aspect-video' : 'h-full'} bg-black transition-all duration-300 overflow-hidden`}>
+                    {showTrailer && !isMobile && item.trailer_url && getYouTubeEmbedUrl(item.trailer_url) ? (
                         <iframe
-                            src={`${item.trailer_url}?autoplay=1&mute=1&controls=0&modestbranding=1&loop=1&playlist=${item.trailer_url.split('/').pop()}`}
+                            src={`${getYouTubeEmbedUrl(item.trailer_url)}?origin=${encodeURIComponent(window.location.origin)}&autoplay=1&mute=1&controls=0&modestbranding=1&loop=1&playlist=${getYouTubeVideoId(item.trailer_url)}`}
                             className="w-full h-full object-cover pointer-events-none scale-[1.50]"
                             frameBorder="0"
                             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                             title={item.title}
-                        />
-                    ) : showTrailer ? (
-                        <img
-                            src={item.banner_image || item.image}
-                            alt={item.title}
-                            className="w-full h-full object-cover"
+                            referrerPolicy="strict-origin-when-cross-origin"
                         />
                     ) : (
                         <img
                             src={item.cover_image || item.image}
                             alt={item.title}
-                            className="w-full h-full object-cover transition-opacity duration-300"
+                            className="w-full h-full object-cover"
                         />
                     )}
                 </div>

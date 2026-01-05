@@ -8,15 +8,17 @@ import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 
 export default function Profile() {
-    const { logout, isAuthenticated, currentProfile, user } = useAuth();
+    const { logout, isAuthenticated, currentProfile, user, isLoading } = useAuth();
     const navigate = useNavigate();
     const [activeTab, setActiveTab] = useState<'watching' | 'likes' | 'list'>('watching');
     const [history, setHistory] = useState<any[]>([]);
     const [myList, setMyList] = useState<any[]>([]);
     const [myLikes, setMyLikes] = useState<any[]>([]);
-    const [loading, setLoading] = useState(true);
+    const [dataLoading, setDataLoading] = useState(true);
 
     useEffect(() => {
+        if (isLoading) return; // Wait for auth check
+
         if (!isAuthenticated) {
             navigate('/login');
             return;
@@ -39,12 +41,12 @@ export default function Profile() {
             } catch (error) {
                 console.error("Failed to fetch profile data:", error);
             } finally {
-                setLoading(false);
+                setDataLoading(false);
             }
         };
 
         fetchProfileData();
-    }, [currentProfile]); // Reload when profile changes
+    }, [currentProfile, isAuthenticated, isLoading]); // Reload when profile changes
 
     const tabs = [
         { id: 'watching', label: 'Assistindo', icon: Clock },
@@ -52,7 +54,7 @@ export default function Profile() {
         { id: 'list', label: 'Minha Lista', icon: List },
     ];
 
-    if (loading) {
+    if (isLoading || dataLoading) {
         return <div className="min-h-screen flex items-center justify-center text-white">Carregando...</div>;
     }
 

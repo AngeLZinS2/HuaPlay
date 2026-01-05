@@ -6,6 +6,7 @@ import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { useModal } from '../context/ModalContext';
+import { getYouTubeEmbedUrl, getYouTubeVideoId } from '../utils/youtube';
 
 export default function SeriesDetailsModal() {
     const { isOpen, content: selectedSeries, closeModal } = useModal();
@@ -128,13 +129,14 @@ export default function SeriesDetailsModal() {
 
                         {/* Header Image Area */}
                         <div className="relative aspect-video w-full">
-                            {selectedSeries.trailer_url ? (
+                            {selectedSeries.trailer_url && getYouTubeEmbedUrl(selectedSeries.trailer_url) ? (
                                 <iframe
                                     ref={iframeRef}
-                                    src={`${selectedSeries.trailer_url}?enablejsapi=1&autoplay=1&mute=1&controls=0&modestbranding=1&loop=1&playlist=${selectedSeries.trailer_url.split('/').pop()}`}
+                                    src={`${getYouTubeEmbedUrl(selectedSeries.trailer_url)}?enablejsapi=1&origin=${encodeURIComponent(window.location.origin)}&autoplay=1&mute=1&controls=0&modestbranding=1&loop=1&playlist=${getYouTubeVideoId(selectedSeries.trailer_url)}`}
                                     className="w-full h-full object-cover pointer-events-none"
                                     frameBorder="0"
                                     allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                    referrerPolicy="strict-origin-when-cross-origin"
                                 />
                             ) : (
                                 <img

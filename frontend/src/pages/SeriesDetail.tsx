@@ -4,6 +4,7 @@ import { motion } from 'framer-motion';
 import { Play, Download, Star, Share2 } from 'lucide-react';
 import VideoPlayer from '../components/VideoPlayer';
 import api from '../services/api';
+import { getYouTubeEmbedUrl } from '../utils/youtube';
 
 export default function SeriesDetail() {
     const { id } = useParams();
@@ -66,14 +67,9 @@ export default function SeriesDetail() {
             return url;
         }
         if (type === 'youtube') {
-            // https://www.youtube.com/watch?v=ID -> https://www.youtube.com/embed/ID
-            // https://youtu.be/ID -> https://www.youtube.com/embed/ID
-            const vParam = url.match(/[?&]v=([^&]+)/);
-            if (vParam && vParam[1]) return `https://www.youtube.com/embed/${vParam[1]}`;
-            if (url.includes('youtu.be/')) {
-                const id = url.split('youtu.be/')[1].split('?')[0];
-                return `https://www.youtube.com/embed/${id}`;
-            }
+            const embed = getYouTubeEmbedUrl(url);
+            // Append origin if valid embed url
+            if (embed) return `${embed}?origin=${window.location.origin}`;
             return url;
         }
         return url;

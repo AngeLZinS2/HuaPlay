@@ -5,10 +5,13 @@
 @theme {
   --color-background: #050505;
   --color-surface: #0a0a0a;
-  --color-primary: #D4AF37; /* Gold */
-  --color-secondary: #8B0000; /* Deep Red */
-  --color-accent: #E5E4E2; /* Platinum */
-  
+  --color-primary: #D4AF37;
+  /* Gold */
+  --color-secondary: #8B0000;
+  /* Deep Red */
+  --color-accent: #E5E4E2;
+  /* Platinum */
+
   --font-display: Cinzel, serif;
   --font-sans: Inter, sans-serif;
 

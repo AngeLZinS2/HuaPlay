@@ -1,7 +1,10 @@
-import { Routes, Route, useLocation } from 'react-router-dom';
+import { Routes, Route, useLocation, useNavigate } from 'react-router-dom';
 import { AnimatePresence } from 'framer-motion';
 import { ModalProvider } from './context/ModalContext';
+import { useAuth } from './context/AuthContext';
+import { useEffect } from 'react';
 import SeriesDetailsModal from './components/SeriesDetailsModal';
+// ... rest of imports
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
 import Home from './pages/Home';
@@ -17,6 +20,17 @@ import PageTransition from './components/PageTransition';
 
 function App() {
   const location = useLocation();
+  const navigate = useNavigate();
+  const { isAuthenticated, currentProfile, isLoading } = useAuth();
+
+  useEffect(() => {
+    // If authenticated but no profile selected, and not on profiles page (or sensitive pages), redirect to profiles
+    if (!isLoading && isAuthenticated && !currentProfile) {
+      if (location.pathname !== '/profiles' && location.pathname !== '/login') {
+        navigate('/profiles');
+      }
+    }
+  }, [isAuthenticated, currentProfile, isLoading, location.pathname, navigate]);
 
   return (
     <ModalProvider>
