@@ -1,4 +1,4 @@
-# Weifansub
+# HuaPlay
 
 Weifansub is a specialized streaming platform for Asian dramas and series, featuring a robust admin dashboard for content management.
 
