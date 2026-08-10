@@ -79,6 +79,11 @@ export const getMe = async () => {
     return response.data;
 };
 
+export const getSeries = async (params?: any) => {
+    const response = await api.get('/series/', { params });
+    return response.data;
+};
+
 export const getAllSeries = async () => {
     const response = await api.get('/series/');
     return response.data;

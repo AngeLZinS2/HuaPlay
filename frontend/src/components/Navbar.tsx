@@ -4,6 +4,7 @@ import { Search, User, Menu, X, ChevronDown, Edit, Repeat, HelpCircle } from 'lu
 import { motion, AnimatePresence } from 'framer-motion';
 import SearchModal from './SearchModal';
 import { useAuth } from '../context/AuthContext';
+import LanguageSwitcher from './LanguageSwitcher';
 
 const navigation = [
     { name: 'CRONOGRAMA', href: '/schedule' },
@@ -124,8 +125,8 @@ export default function Navbar() {
                     </div>
 
                     {/* Icons */}
-                    <div className="hidden md:flex items-center space-x-5">
-
+                    <div className="hidden md:flex items-center space-x-3">
+                        <LanguageSwitcher />
                         <button
                             className="text-gray-300 hover:text-white transition-colors"
                             onClick={() => setIsSearchOpen(true)}

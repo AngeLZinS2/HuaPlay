@@ -1,545 +1,278 @@
-
-import { useState, useEffect, useCallback } from 'react';
+import { useEffect, useState } from 'react';
+import { motion } from 'framer-motion';
 import api from '../services/api';
 import { useToast } from '../context/ToastContext';
-import { motion, AnimatePresence } from 'framer-motion';
+import {
+    Film,
+    PlayCircle,
+    CheckCircle,
+    Users,
+    Tv,
+    Globe,
+    TrendingUp,
+    ArrowUpRight,
+    Clock,
+} from 'lucide-react';
 
-// Refactored Components
-import StatsGrid from '../components/admin/StatsGrid';
-import DashboardToolbar from '../components/admin/DashboardToolbar';
-import SeriesTable from '../components/admin/SeriesTable';
-import ActorsTable from '../components/admin/ActorsTable';
-import SeriesModal from '../components/admin/SeriesModal';
-import ActorModal from '../components/admin/ActorModal';
-import EpisodeModal from '../components/admin/EpisodeModal';
-import EpisodeManager from '../components/admin/EpisodeManager';
+interface Stats {
+    total: number;
+    ongoing: number;
+    completed: number;
+    types?: Record<string, number>;
+}
 
-export default function AdminDashboard() {
-    const { addToast } = useToast();
-    const [activeTab, setActiveTab] = useState<'series' | 'actors' | 'episodes'>('series');
-    const [isModalOpen, setIsModalOpen] = useState(false);
-    const [seriesList, setSeriesList] = useState<any[]>([]);
-    const [actorList, setActorList] = useState<any[]>([]);
-    const [episodeList, setEpisodeList] = useState<any[]>([]);
+interface RecentSeries {
+    id: number;
+    title: string;
+    cover_image: string;
+    type: string;
+    status: string;
+    created_at: string;
+}
 
-    const [loading, setLoading] = useState(true);
-    const [saving, setSaving] = useState(false);
-    const [searchTerm, setSearchTerm] = useState('');
-    const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
-    const [editingId, setEditingId] = useState<number | null>(null);
-    const [editingEpisodeId, setEditingEpisodeId] = useState<number | null>(null);
+const containerVariants = {
+    hidden: {},
+    visible: { transition: { staggerChildren: 0.08 } },
+};
 
-    // Filter states
-    const [filterType, setFilterType] = useState('All');
-    const [filterStatus, setFilterStatus] = useState('All');
-    const [filterCountry, setFilterCountry] = useState('');
-    const [filterYear, setFilterYear] = useState('');
+const cardVariants = {
+    hidden: { opacity: 0, y: 20 },
+    visible: { opacity: 1, y: 0, transition: { duration: 0.4, ease: 'easeOut' } },
+};
 
-    // Pagination
-    const [currentPage, setCurrentPage] = useState(1);
-    const [totalPages, setTotalPages] = useState(1);
-    const itemsPerPage = 8;
-    const [totalItems, setTotalItems] = useState(0);
-
-    const [stats, setStats] = useState({ total: 0, ongoing: 0, completed: 0 });
-    const [formData, setFormData] = useState({
-        title: '',
-        cover_image: '',
-        banner_image: '',
-        description: '',
-        type: 'Series',
-        status: 'Em andamento',
-        release_year: new Date().getFullYear(),
-        country: '',
-        genre: '',
-        cast: '',
-        trailer_url: '',
-        is_featured: false,
-        feature_type: 'TRAILER'
-    });
-
-    const [episodeData, setEpisodeData] = useState({
-        series_id: '',
-        title: '',
-        episode_number: 1,
-        video_url: '',
-        duration: '',
-        thumbnail_url: '',
-        drive_link: '',
-        mega_link: '',
-        mediafire_link: '',
-        pixeldrain_link: '',
-        youtube_link: '',
-        embed_url_1: '',
-        embed_url_2: '',
-        download_link: '',
-        is_locked: false
-    });
-
-    const [actorFormData, setActorFormData] = useState({
-        name: '',
-        gender: 'Female',
-        image_url: ''
-    });
-
-    const [isEpisodeManagerOpen, setIsEpisodeManagerOpen] = useState(false);
-    const [managingSeries, setManagingSeries] = useState<any>(null);
-
-    useEffect(() => {
-        const fetchStats = async () => {
-            try {
-                const response = await api.get('/series/stats');
-                setStats(response.data);
-            } catch (error) {
-                console.error("Failed to fetch stats");
-            }
-        };
-        fetchStats();
-    }, []);
-
-    const fetchSeries = useCallback(async () => {
-        try {
-            setLoading(true);
-            const params: any = {
-                skip: (currentPage - 1) * itemsPerPage,
-                limit: itemsPerPage,
-                search: debouncedSearchTerm || undefined,
-                type: filterType !== 'All' ? filterType : undefined,
-                status: filterStatus !== 'All' ? filterStatus : undefined,
-                country: filterCountry || undefined,
-                release_year: filterYear || undefined
-            };
-
-            const response = await api.get('/series/', { params });
-
-            if (Array.isArray(response.data)) {
-                setSeriesList(response.data);
-                const total = parseInt(response.headers['x-total-count'] || '0');
-                setTotalItems(total);
-                setTotalPages(Math.ceil(total / itemsPerPage));
-            } else {
-                setSeriesList([]);
-                setTotalPages(1);
-            }
-
-        } catch (error) {
-            console.error('Error fetching series:', error);
-            addToast("Erro ao carregar lista de séries.", "error");
-        } finally {
-            setLoading(false);
-        }
-    }, [currentPage, debouncedSearchTerm, filterType, filterStatus, filterCountry, filterYear, addToast]);
-
-    const fetchActors = useCallback(async () => {
-        try {
-            setLoading(true);
-            const response = await api.get('/actors/');
-            setActorList(response.data);
-        } catch (error) {
-            console.error('Error fetching actors:', error);
-            addToast("Erro ao carregar lista de atores.", "error");
-        } finally {
-            setLoading(false);
-        }
-    }, [addToast]);
-
-    useEffect(() => {
-        if (activeTab === 'series') {
-            fetchSeries();
-        } else if (activeTab === 'actors') {
-            fetchActors();
-        }
-    }, [activeTab, fetchSeries, fetchActors]);
-
-    // Debounce search
-    useEffect(() => {
-        const timer = setTimeout(() => {
-            setDebouncedSearchTerm(searchTerm);
-        }, 500);
-        return () => clearTimeout(timer);
-    }, [searchTerm]);
-
-    // Reset to page 1 ONLY when DEBOUNCED search term changes or filters change
-    useEffect(() => {
-        setCurrentPage(1);
-    }, [debouncedSearchTerm, filterType, filterStatus, filterCountry, filterYear]);
-
-
-
-
-    const handleOpenModal = () => {
-        setEditingId(null);
-        setEditingEpisodeId(null);
-        setFormData({
-            title: '',
-            cover_image: '',
-            banner_image: '',
-            description: '',
-            type: 'Series',
-            status: 'Em andamento',
-            release_year: new Date().getFullYear(),
-            country: '',
-            genre: '',
-            cast: '',
-            trailer_url: '',
-            is_featured: false,
-            feature_type: 'TRAILER'
-        });
-        setActorFormData({
-            name: '',
-            gender: 'Female',
-            image_url: ''
-        });
-        // We do typically reset episodeData but keeping series_id might be desired if coming from a context.
-        // But for global add, we reset.
-        setEpisodeData({
-            series_id: seriesList.length > 0 ? seriesList[0].id.toString() : '',
-            title: '',
-            episode_number: 1,
-            video_url: '',
-            duration: '',
-            thumbnail_url: '',
-            drive_link: '',
-            mega_link: '',
-            mediafire_link: '',
-            pixeldrain_link: '',
-            youtube_link: '',
-            embed_url_1: '',
-            embed_url_2: '',
-            download_link: '',
-            is_locked: false
-        });
-        setIsModalOpen(true);
-    };
-
-    const handleEdit = (item: any) => {
-        setEditingId(item.id);
-        if (activeTab === 'series') {
-            setFormData({
-                title: item.title,
-                cover_image: item.cover_image,
-                banner_image: item.banner_image || '',
-                description: item.description,
-                type: item.type,
-                status: item.status,
-                release_year: item.release_year,
-                country: item.country,
-                genre: item.genre,
-                cast: item.cast || '',
-                trailer_url: item.trailer_url || '',
-                is_featured: item.is_featured,
-                feature_type: item.feature_type || 'TRAILER'
-            });
-        }
-        setIsModalOpen(true);
-    };
-
-    const handleEditActor = (actor: any) => {
-        setEditingId(actor.id);
-        setActorFormData({
-            name: actor.name,
-            gender: actor.gender,
-            image_url: actor.image_url
-        });
-        setIsModalOpen(true);
-    };
-
-    const handleDelete = async (id: number) => {
-        if (window.confirm('Tem certeza que deseja excluir?')) {
-            try {
-                await api.delete(`/series/${id}`);
-                addToast("Projeto excluído com sucesso!", "success");
-                fetchSeries();
-            } catch (error) {
-                console.error('Error deleting:', error);
-                addToast("Erro ao excluir projeto.", "error");
-            }
-        }
-    };
-
-    const handleDeleteActor = async (id: number) => {
-        if (window.confirm('Tem certeza que deseja excluir este ator?')) {
-            try {
-                await api.delete(`/actors/${id}`);
-                addToast("Ator excluído com sucesso!", "success");
-                fetchActors();
-            } catch (error) {
-                console.error('Error deleting actor:', error);
-                addToast("Erro ao excluir ator.", "error");
-            }
-        }
-    };
-
-    const handleToggleFeature = async (id: number) => {
-        try {
-            await api.post(`/series/${id}/feature`);
-            addToast("Destaque atualizado!", "success");
-            fetchSeries();
-        } catch (error) {
-            console.error('Error toggling feature:', error);
-            addToast("Erro ao atualizar destaque.", "error");
-        }
-    };
-
-    const handleManageEpisodes = async (series: any) => {
-        setManagingSeries(series);
-        try {
-            const response = await api.get(`/series/${series.id}/episodes`);
-            setEpisodeList(response.data);
-            setIsEpisodeManagerOpen(true);
-        } catch (error) {
-            console.error("Failed to fetch episodes", error);
-            addToast("Erro ao carregar episódios.", "error");
-        }
-    };
-
-    const handleEditEpisode = (episode: any) => {
-        setEditingEpisodeId(episode.id);
-        setEpisodeData({
-            series_id: episode.series_id.toString(),
-            title: episode.title,
-            episode_number: episode.episode_number,
-            video_url: episode.video_url || '',
-            duration: episode.duration || '',
-            thumbnail_url: episode.thumbnail_url || '',
-            drive_link: episode.drive_link || '',
-            mega_link: episode.mega_link || '',
-            mediafire_link: episode.mediafire_link || '',
-            pixeldrain_link: episode.pixeldrain_link || '',
-            youtube_link: episode.youtube_link || '',
-            embed_url_1: episode.embed_url_1 || '',
-            embed_url_2: episode.embed_url_2 || '',
-            download_link: episode.download_link || '',
-            is_locked: episode.is_locked
-        });
-        setIsEpisodeManagerOpen(false);
-        // We set activeTab to 'series' (or keep it) but we need logic to define which modal to show.
-        // We will repurpose 'episodes' tab concept internally or add a specific state 'isEpisodeModalOpen'.
-        // For minimal refactor, I will reuse the 'episodes' tab concept just for the UI state, even if toolbar assumes series/actors.
-        // But since I removed the button, let's keep it simple:
-        // Use a flag or check if episodeData is being edited.
-        // Actually, let's look at my Modal Logic below.
-    };
-
-    const handleDeleteEpisode = async (id: number) => {
-        if (window.confirm("Deletar episódio?")) {
-            try {
-                await api.delete(`/episodes/${id}`);
-                addToast("Episódio deletado.", "success");
-                // Refresh list
-                const response = await api.get(`/series/${managingSeries.id}/episodes`);
-                setEpisodeList(response.data);
-            } catch (error) {
-                addToast("Erro ao deletar.", "error");
-            }
-        }
-    };
-
-    const handleSave = async (e: React.FormEvent) => {
-        e.preventDefault();
-        setSaving(true);
-        try {
-            if (activeTab === 'series' && !editingEpisodeId && !isEpisodeManagerOpen && !episodeData.series_id) { // This condition is a bit tricky, 'activeTab' stays series even when editing episode?
-                if (editingId) {
-                    await api.put(`/series/${editingId}`, formData);
-                    addToast("Projeto atualizado com sucesso!", "success");
-                } else {
-                    await api.post('/series/', formData);
-                    addToast("Projeto adicionado com sucesso!", "success");
-                }
-                setIsModalOpen(false);
-                fetchSeries();
-            } else if (activeTab === 'actors') {
-                if (editingId) {
-                    await api.put(`/actors/${editingId}`, actorFormData);
-                    addToast("Ator atualizado com sucesso!", "success");
-                } else {
-                    await api.post('/actors/', actorFormData);
-                    addToast("Ator adicionado com sucesso!", "success");
-                }
-                setIsModalOpen(false);
-                fetchActors();
-            } else {
-                // Formatting payload for Episode
-                const payload = {
-                    ...episodeData,
-                    series_id: parseInt(episodeData.series_id),
-                    episode_number: parseInt(episodeData.episode_number.toString())
-                };
-
-                if (editingEpisodeId) {
-                    await api.put(`/episodes/${editingEpisodeId}`, payload);
-                    addToast("Episódio atualizado!", "success");
-                } else {
-                    await api.post(`/series/${episodeData.series_id}/episodes`, payload);
-                    addToast("Episódio adicionado!", "success");
-                }
-                setIsModalOpen(false);
-                // If we were managing episodes, reopen manager? or just close?
-                // Ideally refresh the manager list if it was open.
-                if (managingSeries) {
-                    const response = await api.get(`/series/${managingSeries.id}/episodes`);
-                    setEpisodeList(response.data);
-                    setIsEpisodeManagerOpen(true);
-                }
-            }
-        } catch (error) {
-            console.error("Failed to save:", error);
-            addToast("Erro ao salvar. Verifique o console.", "error");
-        } finally {
-            setSaving(false);
-        }
-    };
-
-    const extractSrc = (input: string) => {
-        const match = input.match(/src=["']([^"']+)["']/);
-        return match ? match[1] : input;
-    };
-
-
-
+function StatCard({
+    title,
+    value,
+    icon: Icon,
+    color,
+    sub,
+}: {
+    title: string;
+    value: number;
+    icon: any;
+    color: string;
+    sub?: string;
+}) {
     return (
-        <div className="min-h-screen pt-24 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto pb-20">
-            {/* Header */}
-            <div className="flex justify-between items-center mb-8">
-                <h1 className="text-3xl font-bold text-white">Painel Administrativo</h1>
-                <div className="flex items-center gap-3">
-                    <div className="text-right mr-4">
-                        <p className="text-sm text-gray-400">Admin</p>
-                        <p className="text-white font-medium">Logado</p>
-                    </div>
+        <motion.div
+            variants={cardVariants}
+            className="relative overflow-hidden rounded-2xl border border-white/5 p-6"
+            style={{ background: 'linear-gradient(135deg, #0d0d0d 0%, #111 100%)' }}
+        >
+            {/* Glow */}
+            <div className={`absolute top-0 right-0 w-24 h-24 rounded-full blur-3xl opacity-10 ${color}`} />
+
+            <div className="flex items-start justify-between mb-4">
+                <div className={`p-2.5 rounded-xl ${color.replace('bg-', 'bg-').replace('500', '500/10')} border ${color.replace('bg-', 'border-').replace('500', '500/20')}`}>
+                    <Icon className={`w-5 h-5 ${color.replace('bg-', 'text-')}`} />
+                </div>
+                <div className="flex items-center gap-1 text-xs text-green-400 bg-green-400/10 px-2 py-1 rounded-full">
+                    <TrendingUp className="w-3 h-3" />
+                    <span>Ativo</span>
                 </div>
             </div>
 
-            <StatsGrid stats={stats} />
+            <div>
+                <p className="text-3xl font-bold text-white mb-1">{value.toLocaleString()}</p>
+                <p className="text-sm text-gray-400">{title}</p>
+                {sub && <p className="text-xs text-gray-600 mt-1">{sub}</p>}
+            </div>
+        </motion.div>
+    );
+}
 
-            <DashboardToolbar
-                activeTab={activeTab === 'episodes' ? 'series' : activeTab} // If 'episodes', show 'series' highlighted? Or neither.
-                setActiveTab={setActiveTab}
-                searchTerm={searchTerm}
-                setSearchTerm={setSearchTerm}
-                filterType={filterType}
-                setFilterType={setFilterType}
-                filterStatus={filterStatus}
-                setFilterStatus={setFilterStatus}
-                filterCountry={filterCountry}
-                setFilterCountry={setFilterCountry}
-                filterYear={filterYear}
-                setFilterYear={setFilterYear}
-                onAdd={handleOpenModal}
-            />
-
-            {activeTab === 'series' || activeTab === 'episodes' ? ( // Show Series table even if mode is episodes (modal handles the view) ? No.
-                // If activeTab is episodes, we should probably still show the Series Table in background? 
-                // In original code, the tabs switched the *list content*.
-                // If I set activeTab='episodes', the list disappeared or showed episodes list?
-                // Original: `activeTab === 'series' && <SeriesList ...>`
-                // The user wanted to remove the TAB button because "Duplicate content".
-                // So 'episodes' tab content was mirroring series table?
-                // That implies we should just show SeriesTable when tab is 'series' OR 'episodes'.
-                <SeriesTable
-                    seriesList={seriesList}
-                    loading={loading}
-                    currentPage={currentPage}
-                    totalPages={totalPages}
-                    setCurrentPage={setCurrentPage}
-                    handleEdit={handleEdit}
-                    handleDelete={handleDelete}
-                    handleToggleFeature={handleToggleFeature}
-                    handleManageEpisodes={handleManageEpisodes}
-                    setEpisodeData={setEpisodeData}
-                    setActiveTab={setActiveTab} // Passing this allows the table buttons to switch mode
-                    setIsModalOpen={setIsModalOpen}
-                    itemsPerPage={itemsPerPage}
-                    totalItems={totalItems}
+function TypeBar({ label, value, total, color }: { label: string; value: number; total: number; color: string }) {
+    const pct = total > 0 ? Math.round((value / total) * 100) : 0;
+    return (
+        <div className="space-y-1.5">
+            <div className="flex justify-between text-xs">
+                <span className="text-gray-400">{label}</span>
+                <span className="text-white font-medium">{value} <span className="text-gray-500">({pct}%)</span></span>
+            </div>
+            <div className="h-1.5 bg-white/5 rounded-full overflow-hidden">
+                <motion.div
+                    initial={{ width: 0 }}
+                    animate={{ width: `${pct}%` }}
+                    transition={{ duration: 0.8, delay: 0.3, ease: 'easeOut' }}
+                    className={`h-full rounded-full ${color}`}
                 />
+            </div>
+        </div>
+    );
+}
+
+export default function AdminDashboard() {
+    const { addToast } = useToast();
+    const [stats, setStats] = useState<Stats>({ total: 0, ongoing: 0, completed: 0, types: {} });
+    const [actorCount, setActorCount] = useState(0);
+    const [recentSeries, setRecentSeries] = useState<RecentSeries[]>([]);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        const fetchAll = async () => {
+            try {
+                setLoading(true);
+                const [statsRes, actorsRes, seriesRes] = await Promise.all([
+                    api.get('/series/stats'),
+                    api.get('/actors/'),
+                    api.get('/series/', { params: { limit: 5, skip: 0 } }),
+                ]);
+                setStats(statsRes.data);
+                setActorCount(Array.isArray(actorsRes.data) ? actorsRes.data.length : 0);
+                setRecentSeries(Array.isArray(seriesRes.data) ? seriesRes.data.slice(0, 5) : []);
+            } catch (err) {
+                addToast('Erro ao carregar dados do painel.', 'error');
+            } finally {
+                setLoading(false);
+            }
+        };
+        fetchAll();
+    }, [addToast]);
+
+    const typeColors: Record<string, string> = {
+        Series: 'bg-blue-500',
+        Movie: 'bg-purple-500',
+        Anime: 'bg-pink-500',
+        Donghua: 'bg-orange-500',
+    };
+
+    const typeLabels: Record<string, string> = {
+        Series: 'Séries',
+        Movie: 'Filmes',
+        Anime: 'Animes',
+        Donghua: 'Donghuas',
+    };
+
+    return (
+        <div className="p-6 lg:p-8 max-w-6xl mx-auto">
+            {/* Header */}
+            <div className="mb-8">
+                <h1 className="text-2xl lg:text-3xl font-bold text-white mb-1" style={{ fontFamily: 'Cinzel, serif' }}>
+                    Visão Geral
+                </h1>
+                <p className="text-gray-500 text-sm">
+                    Resumo do conteúdo da plataforma HuaPlay
+                </p>
+            </div>
+
+            {loading ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+                    {[...Array(4)].map((_, i) => (
+                        <div key={i} className="h-36 rounded-2xl bg-white/5 animate-pulse" />
+                    ))}
+                </div>
             ) : (
-                <ActorsTable
-                    actorList={actorList}
-                    loading={loading}
-                    currentPage={currentPage}
-                    itemsPerPage={itemsPerPage} // Assuming actors use same per page or just list all
-                    handleEditActor={handleEditActor}
-                    handleDeleteActor={handleDeleteActor}
-                />
+                <motion.div
+                    variants={containerVariants}
+                    initial="hidden"
+                    animate="visible"
+                    className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8"
+                >
+                    <StatCard title="Total de Projetos" value={stats.total} icon={Film} color="bg-yellow-500" />
+                    <StatCard title="Em Andamento" value={stats.ongoing} icon={PlayCircle} color="bg-blue-500" />
+                    <StatCard title="Concluídos" value={stats.completed} icon={CheckCircle} color="bg-green-500" />
+                    <StatCard title="Atores Cadastrados" value={actorCount} icon={Users} color="bg-purple-500" />
+                </motion.div>
             )}
 
-            <SeriesModal
-                isOpen={isModalOpen && activeTab === 'series'}
-                onClose={() => setIsModalOpen(false)}
-                onSubmit={handleSave}
-                formData={formData}
-                setFormData={setFormData}
-                editingId={editingId}
-                saving={saving}
-                extractSrc={extractSrc}
-            />
+            <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+                {/* Type Breakdown */}
+                <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.3 }}
+                    className="lg:col-span-2 rounded-2xl border border-white/5 p-6"
+                    style={{ background: '#0d0d0d' }}
+                >
+                    <div className="flex items-center gap-2 mb-6">
+                        <Globe className="w-4 h-4 text-yellow-400" />
+                        <h2 className="text-sm font-semibold text-white">Distribuição por Tipo</h2>
+                    </div>
 
-            <ActorModal
-                isOpen={isModalOpen && activeTab === 'actors'}
-                onClose={() => setIsModalOpen(false)}
-                onSubmit={handleSave}
-                actorFormData={actorFormData}
-                setActorFormData={setActorFormData}
-                editingId={editingId}
-                saving={saving}
-            />
+                    {loading ? (
+                        <div className="space-y-4">
+                            {[...Array(4)].map((_, i) => (
+                                <div key={i} className="h-8 rounded bg-white/5 animate-pulse" />
+                            ))}
+                        </div>
+                    ) : (
+                        <div className="space-y-4">
+                            {Object.entries(stats.types ?? {}).map(([type, count]) => (
+                                <TypeBar
+                                    key={type}
+                                    label={typeLabels[type] || type}
+                                    value={count}
+                                    total={stats.total}
+                                    color={typeColors[type] || 'bg-gray-500'}
+                                />
+                            ))}
+                            {Object.keys(stats.types ?? {}).length === 0 && (
+                                <p className="text-gray-600 text-sm">Nenhum dado disponível.</p>
+                            )}
+                        </div>
+                    )}
+                </motion.div>
 
-            <EpisodeModal
-                isOpen={isModalOpen && activeTab === 'episodes'}
-                onClose={() => {
-                    setIsModalOpen(false);
-                    // Optionally switch back to series
-                    if (!managingSeries) setActiveTab('series');
-                    // If we were managing via manager, maybe we want to reopen manager?
-                    if (managingSeries) {
-                        setIsEpisodeManagerOpen(true);
-                        setActiveTab('series'); // Reset tab so background is correct?
-                    }
-                }}
-                onSubmit={handleSave}
-                episodeData={episodeData}
-                setEpisodeData={setEpisodeData}
-                seriesList={seriesList}
-                editingEpisodeId={editingEpisodeId}
-                saving={saving}
-            />
+                {/* Recent Series */}
+                <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.4 }}
+                    className="lg:col-span-3 rounded-2xl border border-white/5 p-6"
+                    style={{ background: '#0d0d0d' }}
+                >
+                    <div className="flex items-center justify-between mb-6">
+                        <div className="flex items-center gap-2">
+                            <Clock className="w-4 h-4 text-yellow-400" />
+                            <h2 className="text-sm font-semibold text-white">Adicionados Recentemente</h2>
+                        </div>
+                        <a href="/admin/series" className="text-xs text-yellow-400 hover:text-yellow-300 flex items-center gap-1 transition-colors">
+                            Ver todos <ArrowUpRight className="w-3 h-3" />
+                        </a>
+                    </div>
 
-            <EpisodeManager
-                isOpen={isEpisodeManagerOpen}
-                onClose={() => setIsEpisodeManagerOpen(false)}
-                managingSeries={managingSeries}
-                episodeList={episodeList}
-                onAddEpisode={() => {
-                    setEpisodeData({
-                        series_id: managingSeries.id.toString(),
-                        title: '',
-                        episode_number: episodeList.length + 1,
-                        video_url: '',
-                        duration: '',
-                        thumbnail_url: '',
-                        drive_link: '',
-                        mega_link: '',
-                        mediafire_link: '',
-                        pixeldrain_link: '',
-                        youtube_link: '',
-                        embed_url_1: '',
-                        embed_url_2: '',
-                        download_link: '',
-                        is_locked: false
-                    });
-                    setEditingEpisodeId(null);
-                    setIsEpisodeManagerOpen(false);
-                    setActiveTab('episodes'); // Switch to episode mode for the Modal
-                    setIsModalOpen(true);
-                }}
-                onEditEpisode={(ep) => {
-                    handleEditEpisode(ep); // This sets data and should switch tab/open modal
-                    setActiveTab('episodes');
-                    setIsModalOpen(true);
-                }}
-                onDeleteEpisode={handleDeleteEpisode}
-            />
+                    {loading ? (
+                        <div className="space-y-3">
+                            {[...Array(5)].map((_, i) => (
+                                <div key={i} className="h-12 rounded-xl bg-white/5 animate-pulse" />
+                            ))}
+                        </div>
+                    ) : (
+                        <div className="space-y-2">
+                            {recentSeries.map((s, idx) => (
+                                <motion.div
+                                    key={s.id}
+                                    initial={{ opacity: 0, x: -10 }}
+                                    animate={{ opacity: 1, x: 0 }}
+                                    transition={{ delay: 0.5 + idx * 0.06 }}
+                                    className="flex items-center gap-3 p-2.5 rounded-xl hover:bg-white/5 transition-colors group"
+                                >
+                                    <div className="w-8 h-11 rounded-lg overflow-hidden bg-gray-800 flex-shrink-0">
+                                        <img src={s.cover_image} alt={s.title} className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" />
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                        <p className="text-white text-sm font-medium truncate">{s.title}</p>
+                                        <p className="text-gray-500 text-xs">{s.type}</p>
+                                    </div>
+                                    <span className={`text-xs px-2 py-0.5 rounded-full border flex-shrink-0 ${
+                                        s.status === 'Completo'
+                                            ? 'bg-green-500/10 text-green-400 border-green-500/20'
+                                            : 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20'
+                                    }`}>
+                                        {s.status === 'Completo' ? 'Completo' : 'Em andamento'}
+                                    </span>
+                                </motion.div>
+                            ))}
+                            {recentSeries.length === 0 && (
+                                <div className="flex flex-col items-center justify-center py-8 text-gray-600">
+                                    <Tv className="w-8 h-8 mb-2 opacity-50" />
+                                    <p className="text-sm">Nenhuma série cadastrada.</p>
+                                </div>
+                            )}
+                        </div>
+                    )}
+                </motion.div>
+            </div>
         </div>
     );
 }

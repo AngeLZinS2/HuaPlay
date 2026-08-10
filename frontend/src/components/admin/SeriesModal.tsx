@@ -1,5 +1,5 @@
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, X, Save } from 'lucide-react';
+import { X, Save, Image, Film, Globe, Link, Star, FileText, Users } from 'lucide-react';
 
 interface SeriesModalProps {
     isOpen: boolean;
@@ -12,6 +12,21 @@ interface SeriesModalProps {
     extractSrc: (input: string) => string;
 }
 
+const inputClass = "w-full bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white focus:border-yellow-500/50 focus:bg-black/60 outline-none transition-all placeholder-gray-600";
+const labelClass = "block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5";
+
+function Section({ title, icon: Icon, children }: { title: string; icon: any; children: React.ReactNode }) {
+    return (
+        <div className="space-y-4">
+            <div className="flex items-center gap-2 pb-2 border-b border-white/5">
+                <Icon className="w-4 h-4 text-yellow-400" />
+                <h3 className="text-sm font-semibold text-gray-300">{title}</h3>
+            </div>
+            {children}
+        </div>
+    );
+}
+
 export default function SeriesModal({
     isOpen,
     onClose,
@@ -20,214 +35,274 @@ export default function SeriesModal({
     setFormData,
     editingId,
     saving,
-    extractSrc
+    extractSrc,
 }: SeriesModalProps) {
     if (!isOpen) return null;
+
+    const update = (field: string, value: any) => setFormData({ ...formData, [field]: value });
 
     return (
         <AnimatePresence>
             <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
                 <motion.div
-                    initial={{ opacity: 0, scale: 0.95 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.95 }}
-                    className="bg-surface border border-gray-700 rounded-xl w-full max-w-5xl p-8 max-h-[90vh] overflow-y-auto shadow-2xl shadow-black"
+                    initial={{ opacity: 0, scale: 0.95, y: 20 }}
+                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                    exit={{ opacity: 0, scale: 0.95, y: 20 }}
+                    transition={{ type: 'spring', duration: 0.4 }}
+                    className="w-full max-w-4xl max-h-[92vh] flex flex-col rounded-2xl border border-white/10 shadow-2xl shadow-black"
+                    style={{ background: '#0d0d0d' }}
+                    onClick={(e) => e.stopPropagation()}
                 >
-                    <div className="flex justify-between items-center mb-8 border-b border-gray-800 pb-4">
-                        <h2 className="text-2xl font-bold flex items-center gap-2 text-white">
-                            <Plus className="w-6 h-6 text-primary" />
-                            {editingId ? 'Editar' : 'Adicionar'} Projeto
-                        </h2>
-                        <button onClick={onClose} className="text-gray-400 hover:text-white transition-colors p-1 hover:bg-white/10 rounded-lg">
-                            <X className="w-6 h-6" />
+                    {/* Header */}
+                    <div className="flex items-center justify-between px-6 py-4 border-b border-white/5 flex-shrink-0">
+                        <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 rounded-lg bg-yellow-500/10 border border-yellow-500/20 flex items-center justify-center">
+                                <Film className="w-4 h-4 text-yellow-400" />
+                            </div>
+                            <div>
+                                <h2 className="text-base font-bold text-white">
+                                    {editingId ? 'Editar Série' : 'Nova Série'}
+                                </h2>
+                                <p className="text-xs text-gray-500">
+                                    {editingId ? `ID #${editingId}` : 'Preencha os campos abaixo'}
+                                </p>
+                            </div>
+                        </div>
+                        <button
+                            onClick={onClose}
+                            className="p-2 rounded-xl hover:bg-white/5 text-gray-500 hover:text-white transition-all"
+                        >
+                            <X className="w-5 h-5" />
                         </button>
                     </div>
 
-                    <form onSubmit={onSubmit} className="space-y-6">
-                        {/* Main Info Grid */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            {/* Left Column: Basic Info */}
-                            <div className="space-y-4">
-                                <div>
-                                    <label className="block text-xs font-semibold text-gray-400 uppercase mb-1">Título</label>
-                                    <input
-                                        type="text"
-                                        value={formData.title}
-                                        onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                                        className="w-full bg-black/50 border border-gray-700 rounded-lg p-3 focus:border-primary outline-none text-white transition-all text-lg font-medium"
-                                        placeholder="Ex: Kingdom of Mystery"
-                                        required
-                                    />
-                                </div>
+                    {/* Scrollable Body */}
+                    <form onSubmit={onSubmit} className="flex-1 overflow-y-auto px-6 py-5 space-y-6">
 
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div>
-                                        <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Status</label>
-                                        <select
-                                            value={formData.status}
-                                            onChange={(e) => setFormData({ ...formData, status: e.target.value })}
-                                            className="w-full bg-black/50 border border-gray-700 rounded-lg p-2.5 focus:border-primary outline-none text-white transition-all"
-                                        >
-                                            <option value="Em andamento">Em andamento</option>
-                                            <option value="Completo">Completo</option>
-                                        </select>
-                                    </div>
-                                    <div>
-                                        <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Tipo</label>
-                                        <select
-                                            value={formData.type}
-                                            onChange={(e) => setFormData({ ...formData, type: e.target.value })}
-                                            className="w-full bg-black/50 border border-gray-700 rounded-lg p-2.5 focus:border-primary outline-none text-white transition-all"
-                                        >
-                                            <option value="Series">Série</option>
-                                            <option value="Movie">Filme</option>
-                                            <option value="Anime">Anime</option>
-                                            <option value="Donghua">Donghua</option>
-                                        </select>
-                                    </div>
-                                </div>
-
-                                <div className="grid grid-cols-3 gap-4">
-                                    <div>
-                                        <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Ano</label>
-                                        <input
-                                            type="number"
-                                            value={formData.release_year}
-                                            onChange={(e) => setFormData({ ...formData, release_year: parseInt(e.target.value) })}
-                                            className="w-full bg-black/50 border border-gray-700 rounded-lg p-2.5 focus:border-primary outline-none text-white transition-all"
-                                            required
-                                        />
-                                    </div>
-                                    <div className="col-span-2">
-                                        <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">País</label>
-                                        <input
-                                            type="text"
-                                            value={formData.country}
-                                            onChange={(e) => setFormData({ ...formData, country: e.target.value })}
-                                            className="w-full bg-black/50 border border-gray-700 rounded-lg p-2.5 focus:border-primary outline-none text-white transition-all"
-                                            required
-                                        />
-                                    </div>
-                                </div>
-
-                                <div>
-                                    <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Gênero</label>
-                                    <input
-                                        type="text"
-                                        value={formData.genre}
-                                        onChange={(e) => setFormData({ ...formData, genre: e.target.value })}
-                                        className="w-full bg-black/50 border border-gray-700 rounded-lg p-2.5 focus:border-primary outline-none text-white transition-all"
-                                        required
-                                    />
-                                </div>
-
-                                <div>
-                                    <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Elenco</label>
-                                    <input
-                                        type="text"
-                                        value={formData.cast}
-                                        onChange={(e) => setFormData({ ...formData, cast: e.target.value })}
-                                        className="w-full bg-black/50 border border-gray-700 rounded-lg p-2.5 focus:border-primary outline-none text-white transition-all"
-                                        placeholder="Atores separados por vírgula"
-                                    />
-                                </div>
+                        {/* Basic Info */}
+                        <Section title="Informações Básicas" icon={FileText}>
+                            <div>
+                                <label className={labelClass}>Título</label>
+                                <input
+                                    type="text"
+                                    value={formData.title}
+                                    onChange={(e) => update('title', e.target.value)}
+                                    className={inputClass}
+                                    placeholder="Ex: Kingdom of Mystery"
+                                    required
+                                />
                             </div>
 
-                            {/* Right Column: Images & Extra */}
-                            <div className="space-y-4">
-                                <div>
-                                    <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Capa URL (Vertical)</label>
-                                    <div className="flex gap-4">
-                                        <input
-                                            type="text"
-                                            value={formData.cover_image}
-                                            onChange={(e) => setFormData({ ...formData, cover_image: e.target.value })}
-                                            className="flex-1 bg-black/50 border border-gray-700 rounded-lg p-2.5 focus:border-primary outline-none text-white transition-all"
-                                        />
-                                        {formData.cover_image && (
-                                            <img src={formData.cover_image} alt="Cover Preview" className="h-10 w-auto rounded border border-gray-700" />
-                                        )}
-                                    </div>
-                                </div>
+                            <div>
+                                <label className={labelClass}>Slug (URL amigável)</label>
+                                <input
+                                    type="text"
+                                    value={formData.slug || ''}
+                                    onChange={(e) => update('slug', e.target.value)}
+                                    className={inputClass}
+                                    placeholder="kingdom-of-mystery"
+                                />
+                            </div>
 
-                                <div>
-                                    <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Banner URL (Horizontal)</label>
-                                    <div className="flex gap-4">
-                                        <input
-                                            type="text"
-                                            value={formData.banner_image}
-                                            onChange={(e) => setFormData({ ...formData, banner_image: e.target.value })}
-                                            className="flex-1 bg-black/50 border border-gray-700 rounded-lg p-2.5 focus:border-primary outline-none text-white transition-all"
-                                        />
-                                        {formData.banner_image && (
-                                            <img src={formData.banner_image} alt="Banner Preview" className="h-10 w-auto rounded border border-gray-700" />
-                                        )}
-                                    </div>
-                                </div>
-
-                                <div>
-                                    <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Trailer URL</label>
-                                    <input
-                                        type="text"
-                                        value={formData.trailer_url}
-                                        onChange={(e) => setFormData({ ...formData, trailer_url: extractSrc(e.target.value) })}
-                                        className="w-full bg-black/50 border border-gray-700 rounded-lg p-2.5 focus:border-primary outline-none text-white transition-all"
-                                        placeholder="YouTube, Ok.ru ou Google Drive"
-                                    />
-                                </div>
-
-                                <div>
-                                    <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Tipo de Destaque</label>
-                                    <div className="flex bg-black/50 border border-gray-700 rounded-lg p-1">
-                                        <button
-                                            type="button"
-                                            onClick={() => setFormData({ ...formData, feature_type: 'TRAILER' })}
-                                            className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${formData.feature_type === 'TRAILER'
-                                                ? 'bg-primary text-black'
-                                                : 'text-gray-400 hover:text-white'
-                                                }`}
-                                        >
-                                            Trailer
-                                        </button>
-                                        <button
-                                            type="button"
-                                            onClick={() => setFormData({ ...formData, feature_type: 'BANNER' })}
-                                            className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${formData.feature_type === 'BANNER'
-                                                ? 'bg-primary text-black'
-                                                : 'text-gray-400 hover:text-white'
-                                                }`}
-                                        >
-                                            Banner
-                                        </button>
-                                    </div>
-                                </div>
-
-                                <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Descrição</label>
+                            <div>
+                                <label className={labelClass}>Descrição / Sinopse</label>
                                 <textarea
                                     value={formData.description}
-                                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                                    className="w-full bg-black/50 border border-gray-700 rounded-lg p-2.5 focus:border-primary outline-none h-[120px] text-white transition-all focus:bg-black/80 resize-none text-sm leading-relaxed"
+                                    onChange={(e) => update('description', e.target.value)}
+                                    className={`${inputClass} h-24 resize-none`}
                                     placeholder="Sinopse do drama..."
                                 />
                             </div>
-                        </div>
 
-                        <button
-                            type="submit"
-                            disabled={saving}
-                            className="w-full bg-primary hover:bg-red-700 disabled:opacity-50 text-white font-bold py-3 rounded-lg mt-6 flex items-center justify-center gap-2 transition-all hover:scale-[1.02] active:scale-[0.98]"
-                        >
-                            {saving ? (
-                                <>
-                                    <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                                    Salvando...
-                                </>
-                            ) : (
-                                <>
-                                    <Save className="w-5 h-5" /> Salvar Projeto
-                                </>
-                            )}
-                        </button>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className={labelClass}>Tipo</label>
+                                    <select value={formData.type} onChange={(e) => update('type', e.target.value)} className={inputClass}>
+                                        <option value="Series">Série</option>
+                                        <option value="Movie">Filme</option>
+                                        <option value="Anime">Anime</option>
+                                        <option value="Donghua">Donghua</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className={labelClass}>Status</label>
+                                    <select value={formData.status} onChange={(e) => update('status', e.target.value)} className={inputClass}>
+                                        <option value="Em andamento">Em andamento</option>
+                                        <option value="Completo">Completo</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className={labelClass}>Ano de Lançamento</label>
+                                    <input
+                                        type="number"
+                                        value={formData.release_year}
+                                        onChange={(e) => update('release_year', parseInt(e.target.value))}
+                                        className={inputClass}
+                                        required
+                                    />
+                                </div>
+                                <div>
+                                    <label className={labelClass}>País de Origem</label>
+                                    <input
+                                        type="text"
+                                        value={formData.country}
+                                        onChange={(e) => update('country', e.target.value)}
+                                        className={inputClass}
+                                        placeholder="China"
+                                        required
+                                    />
+                                </div>
+                            </div>
+
+                            <div>
+                                <label className={labelClass}>Gênero(s)</label>
+                                <input
+                                    type="text"
+                                    value={formData.genre}
+                                    onChange={(e) => update('genre', e.target.value)}
+                                    className={inputClass}
+                                    placeholder="Romance, Ação, Fantasia"
+                                    required
+                                />
+                            </div>
+
+                            <div>
+                                <label className={labelClass}>Elenco Principal</label>
+                                <input
+                                    type="text"
+                                    value={formData.cast || ''}
+                                    onChange={(e) => update('cast', e.target.value)}
+                                    className={inputClass}
+                                    placeholder="Atores separados por vírgula"
+                                />
+                            </div>
+                        </Section>
+
+                        {/* Images */}
+                        <Section title="Imagens" icon={Image}>
+                            <div>
+                                <label className={labelClass}>Capa Vertical (URL)</label>
+                                <div className="flex gap-3 items-start">
+                                    <input
+                                        type="text"
+                                        value={formData.cover_image || ''}
+                                        onChange={(e) => update('cover_image', e.target.value)}
+                                        className={`${inputClass} flex-1`}
+                                        placeholder="https://..."
+                                    />
+                                    {formData.cover_image && (
+                                        <img src={formData.cover_image} alt="Capa" className="h-16 w-11 object-cover rounded-lg border border-white/10 flex-shrink-0" />
+                                    )}
+                                </div>
+                            </div>
+                            <div>
+                                <label className={labelClass}>Banner Horizontal (URL)</label>
+                                <div className="flex gap-3 items-start">
+                                    <input
+                                        type="text"
+                                        value={formData.banner_image || ''}
+                                        onChange={(e) => update('banner_image', e.target.value)}
+                                        className={`${inputClass} flex-1`}
+                                        placeholder="https://..."
+                                    />
+                                    {formData.banner_image && (
+                                        <img src={formData.banner_image} alt="Banner" className="h-16 w-28 object-cover rounded-lg border border-white/10 flex-shrink-0" />
+                                    )}
+                                </div>
+                            </div>
+                        </Section>
+
+                        {/* Highlight */}
+                        <Section title="Destaque no Hero" icon={Star}>
+                            <div className="flex items-center gap-3 p-3 rounded-xl bg-yellow-500/5 border border-yellow-500/10">
+                                <input
+                                    type="checkbox"
+                                    id="is_featured"
+                                    checked={formData.is_featured}
+                                    onChange={(e) => update('is_featured', e.target.checked)}
+                                    className="w-4 h-4 accent-yellow-400"
+                                />
+                                <label htmlFor="is_featured" className="text-sm text-gray-300 cursor-pointer">
+                                    Exibir esta série em destaque no Hero da página inicial
+                                </label>
+                            </div>
+                            <div>
+                                <label className={labelClass}>Tipo de Destaque</label>
+                                <div className="grid grid-cols-2 gap-2">
+                                    {['TRAILER', 'BANNER'].map((type) => (
+                                        <button
+                                            key={type}
+                                            type="button"
+                                            onClick={() => update('feature_type', type)}
+                                            className={`py-2.5 rounded-xl text-sm font-medium border transition-all ${
+                                                formData.feature_type === type
+                                                    ? 'bg-yellow-500/10 border-yellow-500/30 text-yellow-400'
+                                                    : 'border-white/5 text-gray-500 hover:text-white hover:bg-white/5'
+                                            }`}
+                                        >
+                                            {type === 'TRAILER' ? '🎬 Trailer' : '🖼️ Banner'}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                            <div>
+                                <label className={labelClass}>URL do Trailer</label>
+                                <input
+                                    type="text"
+                                    value={formData.trailer_url || ''}
+                                    onChange={(e) => update('trailer_url', extractSrc(e.target.value))}
+                                    className={inputClass}
+                                    placeholder="YouTube, Ok.ru ou embed URL"
+                                />
+                            </div>
+                        </Section>
+
+                        {/* Download Links */}
+                        <Section title="Links de Download da Série" icon={Link}>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                {[
+                                    { key: 'drive_link', label: 'Google Drive', placeholder: 'https://drive.google.com/...' },
+                                    { key: 'mega_link', label: 'Mega', placeholder: 'https://mega.nz/...' },
+                                    { key: 'mediafire_link', label: 'Mediafire', placeholder: 'https://mediafire.com/...' },
+                                    { key: 'pixeldrain_link', label: 'Pixeldrain', placeholder: 'https://pixeldrain.com/...' },
+                                ].map(({ key, label, placeholder }) => (
+                                    <div key={key}>
+                                        <label className={labelClass}>{label}</label>
+                                        <input
+                                            type="text"
+                                            value={formData[key] || ''}
+                                            onChange={(e) => update(key, e.target.value)}
+                                            className={inputClass}
+                                            placeholder={placeholder}
+                                        />
+                                    </div>
+                                ))}
+                            </div>
+                        </Section>
+
+                        {/* Submit */}
+                        <div className="pt-2 pb-1">
+                            <button
+                                type="submit"
+                                disabled={saving}
+                                className="w-full py-3 rounded-xl bg-yellow-500 hover:bg-yellow-400 disabled:opacity-50 text-black font-bold text-sm flex items-center justify-center gap-2 transition-all shadow-lg shadow-yellow-500/20"
+                            >
+                                {saving ? (
+                                    <>
+                                        <div className="w-4 h-4 border-2 border-black/30 border-t-black rounded-full animate-spin" />
+                                        Salvando...
+                                    </>
+                                ) : (
+                                    <>
+                                        <Save className="w-4 h-4" />
+                                        {editingId ? 'Salvar Alterações' : 'Criar Série'}
+                                    </>
+                                )}
+                            </button>
+                        </div>
                     </form>
                 </motion.div>
             </div>

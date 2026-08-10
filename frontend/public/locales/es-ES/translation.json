@@ -1,0 +1,109 @@
+{
+  "nav": {
+    "home": "Inicio",
+    "explore": "Explorar",
+    "myList": "Mi Lista",
+    "actors": "Actores",
+    "actresses": "Actrices",
+    "login": "Entrar",
+    "logout": "Salir",
+    "profile": "Perfil",
+    "admin": "Admin"
+  },
+  "home": {
+    "hero": {
+      "watch": "Ver",
+      "addToList": "Mi Lista",
+      "removeFromList": "Quitar",
+      "moreInfo": "Más Información"
+    },
+    "sections": {
+      "featured": "Destacados",
+      "recent": "Agregados Recientemente",
+      "chinese": "Dramas Chinos",
+      "korean": "Dramas Coreanos",
+      "thai": "Dramas Tailandeses",
+      "donghua": "Donghuas",
+      "movies": "Películas"
+    }
+  },
+  "series": {
+    "episodes": "Episodios",
+    "episode": "Episodio",
+    "status": {
+      "ongoing": "En curso",
+      "completed": "Completo"
+    },
+    "type": {
+      "series": "Serie",
+      "movie": "Película",
+      "anime": "Anime",
+      "donghua": "Donghua"
+    },
+    "links": {
+      "watch": "Ver",
+      "download": "Descargar",
+      "drive": "Drive",
+      "mega": "Mega",
+      "mediafire": "Mediafire",
+      "pixeldrain": "Pixeldrain",
+      "youtube": "YouTube",
+      "embed": "Reproductor"
+    },
+    "info": {
+      "genre": "Género",
+      "country": "País",
+      "year": "Año",
+      "cast": "Reparto",
+      "rating": "Nota"
+    },
+    "noEpisodes": "No hay episodios disponibles."
+  },
+  "actors": {
+    "title": "Actores",
+    "actress": "Actriz",
+    "actor": "Actor",
+    "bio": "Biografía",
+    "birthDate": "Fecha de Nacimiento",
+    "realName": "Nombre Real",
+    "projects": "Proyectos"
+  },
+  "auth": {
+    "login": "Iniciar Sesión",
+    "email": "Correo",
+    "password": "Contraseña",
+    "loginBtn": "Entrar",
+    "loginError": "Correo o contraseña incorrectos.",
+    "noAccount": "¿No tienes cuenta?"
+  },
+  "profile": {
+    "selectProfile": "¿Quién está viendo?",
+    "addProfile": "Agregar Perfil",
+    "editProfile": "Editar Perfil",
+    "name": "Nombre",
+    "save": "Guardar"
+  },
+  "myList": {
+    "title": "Mi Lista",
+    "empty": "Tu lista está vacía.",
+    "emptyDesc": "Agrega series y películas para ver más tarde."
+  },
+  "common": {
+    "loading": "Cargando...",
+    "error": "Error al cargar.",
+    "retry": "Reintentar",
+    "close": "Cerrar",
+    "save": "Guardar",
+    "cancel": "Cancelar",
+    "delete": "Eliminar",
+    "edit": "Editar",
+    "search": "Buscar",
+    "noResults": "Sin resultados.",
+    "seeAll": "Ver todo",
+    "back": "Volver"
+  },
+  "footer": {
+    "rights": "Todos los derechos reservados.",
+    "description": "Tu plataforma de dramas asiáticos con subtítulos en portugués."
+  }
+}

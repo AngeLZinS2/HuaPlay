@@ -15,6 +15,46 @@ export default function SeriesDetail() {
     const [loading, setLoading] = useState(true);
     const [activeSource, setActiveSource] = useState<string>('');
 
+    // Helper to transform common file host links to embeddable versions
+    const transformToEmbed = (url: string, type: 'drive' | 'pixeldrain' | 'mega' | 'youtube') => {
+        if (!url) return '';
+        if (type === 'drive') {
+            const idMatch = url.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
+            if (idMatch && idMatch[1]) {
+                return `https://drive.google.com/file/d/${idMatch[1]}/preview`;
+            }
+            if (url.includes('/view')) return url.replace('/view', '/preview');
+            return url;
+        }
+        if (type === 'pixeldrain') {
+            return url;
+        }
+        if (type === 'mega') {
+            if (url.includes('/file/')) return url.replace('/file/', '/embed/');
+            return url;
+        }
+        if (type === 'youtube' || url.includes('youtu')) {
+            const embed = getYouTubeEmbedUrl(url);
+            if (embed) return `${embed}?origin=${window.location.origin}`;
+            return url;
+        }
+        return url;
+    };
+
+    const getBestEmbedSource = (ep: any) => {
+        if (!ep) return '';
+        if (ep.embed_url_1) {
+            if (ep.embed_url_1.includes('youtu')) return transformToEmbed(ep.embed_url_1, 'youtube');
+            return ep.embed_url_1;
+        }
+        if (ep.embed_url_2) return ep.embed_url_2;
+        if (ep.youtube_link) return transformToEmbed(ep.youtube_link, 'youtube');
+        if (ep.drive_link) return transformToEmbed(ep.drive_link, 'drive');
+        if (ep.pixeldrain_link) return transformToEmbed(ep.pixeldrain_link, 'pixeldrain');
+        if (ep.mega_link) return transformToEmbed(ep.mega_link, 'mega');
+        return '';
+    };
+
     useEffect(() => {
         const fetchSeriesData = async () => {
             try {
@@ -27,8 +67,7 @@ export default function SeriesDetail() {
                 if (episodesRes.data.length > 0) {
                     const firstEp = episodesRes.data[0];
                     setSelectedEpisode(firstEp);
-                    // Default to Embed 1, then Embed 2, then Drive (transformed)
-                    setActiveSource(firstEp.embed_url_1 || firstEp.embed_url_2 || transformToEmbed(firstEp.drive_link, 'drive') || '');
+                    setActiveSource(getBestEmbedSource(firstEp));
                 }
             } catch (error) {
                 console.error("Failed to fetch series data:", error);
@@ -42,45 +81,11 @@ export default function SeriesDetail() {
         }
     }, [id]);
 
-    // Helper to transform common file host links to embeddable versions
-    const transformToEmbed = (url: string, type: 'drive' | 'pixeldrain' | 'mega' | 'youtube') => {
-        if (!url) return '';
-        if (type === 'drive') {
-            // Extract ID and force preview
-            // Matches /file/d/ID or /open?id=ID
-            const idMatch = url.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
-            if (idMatch && idMatch[1]) {
-                return `https://drive.google.com/file/d/${idMatch[1]}/preview`;
-            }
-            // Fallback: replace /view with /preview if simple subst needed
-            if (url.includes('/view')) return url.replace('/view', '/preview');
-            return url;
-        }
-        if (type === 'pixeldrain') {
-            // https://pixeldrain.com/u/ID -> https://pixeldrain.com/u/ID?embed could be better but direct /u/ID often works in iframe or requires handling
-            // Search suggests iframe src=url is standard.
-            return url;
-        }
-        if (type === 'mega') {
-            // https://mega.nz/file/ID#KEY -> https://mega.nz/embed/ID#KEY
-            if (url.includes('/file/')) return url.replace('/file/', '/embed/');
-            return url;
-        }
-        if (type === 'youtube') {
-            const embed = getYouTubeEmbedUrl(url);
-            // Append origin if valid embed url
-            if (embed) return `${embed}?origin=${window.location.origin}`;
-            return url;
-        }
-        return url;
-    };
-
     // Reset source when episode changes
     const handleEpisodeSelect = (ep: any) => {
         setSelectedEpisode(ep);
         setUseAlternativeLink(false);
-        setActiveSource(ep.embed_url_1 || ep.embed_url_2 || transformToEmbed(ep.drive_link, 'drive') || '');
-        // Scroll to player
+        setActiveSource(getBestEmbedSource(ep));
         window.scrollTo({ top: 0, behavior: 'smooth' });
     };
 

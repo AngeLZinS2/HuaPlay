@@ -1,0 +1,109 @@
+{
+  "nav": {
+    "home": "Home",
+    "explore": "Explore",
+    "myList": "My List",
+    "actors": "Actors",
+    "actresses": "Actresses",
+    "login": "Login",
+    "logout": "Logout",
+    "profile": "Profile",
+    "admin": "Admin"
+  },
+  "home": {
+    "hero": {
+      "watch": "Watch",
+      "addToList": "My List",
+      "removeFromList": "Remove",
+      "moreInfo": "More Info"
+    },
+    "sections": {
+      "featured": "Featured",
+      "recent": "Recently Added",
+      "chinese": "Chinese Dramas",
+      "korean": "Korean Dramas",
+      "thai": "Thai Dramas",
+      "donghua": "Donghuas",
+      "movies": "Movies"
+    }
+  },
+  "series": {
+    "episodes": "Episodes",
+    "episode": "Episode",
+    "status": {
+      "ongoing": "Ongoing",
+      "completed": "Completed"
+    },
+    "type": {
+      "series": "Series",
+      "movie": "Movie",
+      "anime": "Anime",
+      "donghua": "Donghua"
+    },
+    "links": {
+      "watch": "Watch",
+      "download": "Download",
+      "drive": "Drive",
+      "mega": "Mega",
+      "mediafire": "Mediafire",
+      "pixeldrain": "Pixeldrain",
+      "youtube": "YouTube",
+      "embed": "Player"
+    },
+    "info": {
+      "genre": "Genre",
+      "country": "Country",
+      "year": "Year",
+      "cast": "Cast",
+      "rating": "Rating"
+    },
+    "noEpisodes": "No episodes available."
+  },
+  "actors": {
+    "title": "Actors",
+    "actress": "Actress",
+    "actor": "Actor",
+    "bio": "Biography",
+    "birthDate": "Birth Date",
+    "realName": "Real Name",
+    "projects": "Projects"
+  },
+  "auth": {
+    "login": "Sign In",
+    "email": "Email",
+    "password": "Password",
+    "loginBtn": "Sign in",
+    "loginError": "Incorrect email or password.",
+    "noAccount": "Don't have an account?"
+  },
+  "profile": {
+    "selectProfile": "Who's watching?",
+    "addProfile": "Add Profile",
+    "editProfile": "Edit Profile",
+    "name": "Name",
+    "save": "Save"
+  },
+  "myList": {
+    "title": "My List",
+    "empty": "Your list is empty.",
+    "emptyDesc": "Add series and movies to watch later."
+  },
+  "common": {
+    "loading": "Loading...",
+    "error": "Error loading.",
+    "retry": "Retry",
+    "close": "Close",
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "edit": "Edit",
+    "search": "Search",
+    "noResults": "No results found.",
+    "seeAll": "See all",
+    "back": "Back"
+  },
+  "footer": {
+    "rights": "All rights reserved.",
+    "description": "Your platform for Asian dramas with Portuguese subtitles."
+  }
+}

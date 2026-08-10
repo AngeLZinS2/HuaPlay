@@ -16,11 +16,8 @@ def get_current_profile(
     current_user: models.User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    # Migration Logic: If user has NO profiles, create "Main"
-    # This is a bit lazy but effective for self-healing
     existing_profiles = db.query(models.UserProfile).filter(models.UserProfile.user_id == current_user.id).all()
     if not existing_profiles:
-        # Determine default name: Full Name > Email Username > "Principal"
         default_name = current_user.full_name
         if not default_name and current_user.email:
              default_name = current_user.email.split('@')[0]
@@ -35,22 +32,14 @@ def get_current_profile(
         db.add(main_profile)
         db.commit()
         db.refresh(main_profile)
-        # Assuming we migrated data manually or just starting fresh for simplicity as per plan "data migration" usually implies scripts. 
-        # For now, new profile = empty list, unless we handle migration here. 
-        # Let's just return this new profile if no header provided? 
-        if not x_profile_id:
-            return main_profile
         existing_profiles = [main_profile]
 
     if not x_profile_id:
-        # If frontend didn't send header, maybe they are just listing profiles?
-        # For endpoints that REQUIRE a profile (lists), this should raise.
-        # But we'll let the endpoint decide. returning None here.
-        return None
+        return existing_profiles[0]
 
     profile = db.query(models.UserProfile).filter(models.UserProfile.id == x_profile_id).first()
     if not profile or profile.user_id != current_user.id:
-        raise HTTPException(status_code=403, detail="Invalid profile or not authorized")
+        return existing_profiles[0]
     
     return profile
 

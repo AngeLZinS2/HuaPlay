@@ -1,97 +1,94 @@
-# HuaPlay
+# HuaPlay Streaming Platform
 
-Weifansub is a specialized streaming platform for Asian dramas and series, featuring a robust admin dashboard for content management.
+HuaPlay é uma plataforma de streaming moderna e intuitiva especializada em doramas e séries asiáticas, equipada com um **Motor de Recomendação por Machine Learning**, gerenciamento de **Múltiplos Perfis de Usuário** e um **Painel Administrativo Completo**.
 
-## 🚀 Features
+---
 
-- **Public Interface**:
-  - Modern, responsive Hero section with video backgrounds and banners.
-  - Series browsing with filtering by Type (Drama, Movie, etc.), Status, Country, and Year.
-  - Detailed Series pages with episodes, cast, and related content.
-  - Mobile-responsive design.
+## 🚀 Funcionalidades Principais
 
-- **Admin Dashboard**:
-  - Secure authentication.
-  - **Dashboard Overview**: Visualization of total stats (Series, Ongoing, Completed).
-  - **Series Management**: Add, Edit, Delete, Search, Filter, and Paginate series.
-  - **Episode Management**: Manage episodes, including multiple embed sources, YouTube links, and download links.
-  - **Actor Management**: Manage actor profiles linked to series.
-  - **Highlight Control**: Toggle series as "Featured" with choice of Trailer or Banner highlight.
+### 🎬 Plataforma Pública & Interface de Usuário
+- **Hero Banner Dinâmico**: Rotação automática de doramas em destaque em Full HD com reprodução de trailers em alta definição.
+- **Motor de Recomendação por Machine Learning (`recommender.py`)**:
+  - Algoritmo baseado em **TF-IDF** e **Similaridade de Cosseno (Cosine Similarity)**.
+  - Seleção personalizada baseada no histórico de exibição (`watch_history`), curtidas (`likes`) e lista de conteúdos (`user_list`).
+  - Seções inteligentes *"Recomendados para Você"* e *"Porque Você Assistiu [Nome do Dorama]"*.
+- **Múltiplos Perfis de Usuário**: Suporte a criação e troca de perfis (estilo Netflix) com avatares customizáveis.
+- **Player de Vídeo Universal**: Suporte a embutimento automático de vídeos do YouTube, Google Drive, Mega, Mediafire, Pixeldrain e servidores externos.
+- **Exploração Avançada de Tags & Gêneros**: Filtros estritos por tags originais da WeiFansub (*Wuxia, Xianxia, Ação/Mistério, Coabitação, Age Gap, LGBTQIA+, Escolar, República*, etc.).
+- **Filtro por Ano de Lançamento & País**: Suporte a navegação por ano (2026 a 2002+) e país de origem (Coreia do Sul, China, Japão, Tailândia, etc.).
 
-## 🛠 Tech Stack
+### ⚙️ Painel Administrativo (`/admin`)
+- **Dashboard de Métricas**: Indicadores de total de séries, obras concluídas, em andamento e por tipo.
+- **Gerenciamento de Séries**: Criação, edição, busca com paginação e filtro por Ano de Lançamento.
+- **Gerenciamento de Episódios**: Upload e vinculação de múltiplos provedores de vídeo e download por episódio.
+- **Elenco e Atores**: Cadastro e vinculação de atores com perfis individuais.
+
+---
+
+## 🛠 Tecnologia
 
 ### Frontend
-- **Framework**: React (Vite)
-- **Language**: TypeScript
-- **Styling**: Tailwind CSS
-- **Icons**: Lucide React
-- **Animations**: Framer Motion
+- **Framework**: React 18 (Vite)
+- **Linguagem**: TypeScript
+- **Estilização**: Vanilla CSS / Tailwind CSS
+- **Animações**: Framer Motion
+- **Ícones**: Lucide React
 - **HTTP Client**: Axios
 
 ### Backend
-- **Framework**: FastAPI (Python)
-- **Database**: SQLite (SQLAlchemy ORM)
-- **Authentication**: JWT (JSON Web Tokens)
+- **Framework**: FastAPI (Python 3.13)
+- **Inteligência**: Scikit-learn / Counter Vector TF-IDF Cosine Math Engine
+- **Banco de Dados**: SQLite (`weifansub.db`) via SQLAlchemy ORM
+- **Autenticação**: JWT Tokens & Bcrypt Direct Hashing
 
-## 📦 Project Structure
+---
+
+## 📦 Estrutura do Repositório
 
 ```bash
-Weifansub/
-├── backend/            # FastAPI Backend
-│   ├── routers/        # API Routes (series, actors, etc.)
-│   ├── main.py         # Application entry point
-│   ├── models.py       # Database models
-│   ├── schemas.py      # Pydantic schemas
-│   └── weifansub.db    # SQLite Database
-├── frontend/           # React Frontend
+HuaPlay/
+├── backend/            # API FastAPI & Recomendador ML
+│   ├── routers/        # Rotas da API (series, users, auth, actors)
+│   ├── scripts/        # Scripts utilitários de scraping e TMDb HD
+│   ├── recommender.py  # Motor de Inteligência ML (TF-IDF + Cosine Sim)
+│   ├── auth.py         # Módulo de Autenticação Bcrypt
+│   ├── main.py         # Ponto de entrada da aplicação
+│   ├── models.py       # Modelos de dados SQLAlchemy
+│   ├── schemas.py      # Esquemas Pydantic
+│   └── weifansub.db    # Banco de dados SQLite de Produção
+├── frontend/           # Aplicação React + Vite
 │   ├── src/
-│   │   ├── components/ # Reusable UI components
-│   │   ├── pages/      # Application pages (AdminDashboard, Home, etc.)
-│   │   └── services/   # API services
+│   │   ├── components/ # Componentes reutilizáveis (Hero, SeriesRow, Navbar)
+│   │   ├── pages/      # Páginas (Home, SeriesDetail, Admin, CategoryExplore)
+│   │   ├── context/    # Contextos globais (AuthContext, ModalContext)
+│   │   └── services/   # Cliente API Axios
 │   └── index.html
-└── docs/               # Detailed Documentation
+└── docs/               # Documentação técnica detalhada
 ```
 
-## 🏁 Quick Start
+---
 
-### Backend
-1. Navigate to the backend directory:
-   ```bash
-   cd backend
-   ```
-2. Create and activate virtual environment:
-   ```bash
-   python -m venv venv
-   # Windows
-   .\venv\Scripts\activate
-   # Linux/Mac
-   source venv/bin/activate
-   ```
-3. Install dependencies:
-   ```bash
-   pip install -r requirements.txt
-   ```
-4. Run the server:
-   ```bash
-   uvicorn main:app --reload
-   ```
+## 🏁 Inicialização Rápida
 
-### Frontend
-1. Navigate to the frontend directory:
-   ```bash
-   cd frontend
-   ```
-2. Install dependencies:
-   ```bash
-   npm install
-   ```
-3. Run the development server:
-   ```bash
-   npm run dev
-   ```
+### Backend (Servidor API)
+```bash
+cd backend
+.\venv\Scripts\activate
+uvicorn main:app --reload --port 8000
+# Ou execute diretamente:
+.\run_server.bat
+```
 
-## 📚 Documentation
+### Frontend (Aplicação Web)
+```bash
+cd frontend
+npm install
+npm run dev
+```
 
-For more detailed information, please check the `docs/` folder:
-- [Backend Documentation](docs/BACKEND.md)
-- [Frontend Documentation](docs/FRONTEND.md)
+---
+
+## 📚 Documentação Adicional
+
+- [Documentação do Backend](docs/BACKEND.md)
+- [Documentação do Frontend](docs/FRONTEND.md)

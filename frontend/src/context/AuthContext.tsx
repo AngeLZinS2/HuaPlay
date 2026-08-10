@@ -46,13 +46,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const fetchProfiles = async () => {
         try {
             const res = await api.get('/users/profiles');
-            setProfiles(res.data);
+            const list = res.data || [];
+            setProfiles(list);
 
-            // Restore current profile if defined
             const storedProfileId = localStorage.getItem('current_profile_id');
-            if (storedProfileId) {
-                const found = res.data.find((p: any) => p.id === parseInt(storedProfileId));
-                if (found) setCurrentProfile(found);
+            let profileToSelect = null;
+            if (storedProfileId && list.length > 0) {
+                profileToSelect = list.find((p: any) => p.id === parseInt(storedProfileId));
+            }
+            if (!profileToSelect && list.length > 0) {
+                profileToSelect = list[0];
+            }
+
+            if (profileToSelect) {
+                setCurrentProfile(profileToSelect);
+                localStorage.setItem('current_profile_id', profileToSelect.id.toString());
             }
         } catch (error) {
             console.error("Failed to fetch profiles", error);
@@ -61,21 +69,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const refreshUserData = async () => {
         try {
-            // First get user
             const userRes = await api.get('/users/me');
             setUser(userRes.data);
-
-            // Then get profiles
             await fetchProfiles();
-
-            // Only fetch lists if we have a profile selected
-            const storedProfileId = localStorage.getItem('current_profile_id');
-            if (storedProfileId) {
-                await updateLists();
-            }
+            await updateLists();
         } catch (error: any) {
             console.error("Failed to fetch user data", error);
-            // If 401/403, invalid token, so logout
             if (error.response && (error.response.status === 401 || error.response.status === 403)) {
                 logout();
             }

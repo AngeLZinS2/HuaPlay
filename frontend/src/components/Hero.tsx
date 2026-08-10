@@ -44,9 +44,14 @@ export default function Hero() {
         const fetchFeatured = async () => {
             try {
                 const response = await api.get('/series/?is_featured=true');
-                const featuredSeries = response.data.length > 0 ? response.data[0] : null;
-                if (featuredSeries) {
-                    setFeatured(featuredSeries);
+                let pool = response.data;
+                if (!pool || pool.length === 0) {
+                    const fallbackRes = await api.get('/series/?limit=30');
+                    pool = (fallbackRes.data || []).filter((s: any) => s.banner_image);
+                }
+                if (pool && pool.length > 0) {
+                    const randomIndex = Math.floor(Math.random() * pool.length);
+                    setFeatured(pool[randomIndex]);
                 }
             } catch (error) {
                 console.error("Failed to fetch featured series:", error);

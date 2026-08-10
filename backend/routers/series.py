@@ -10,13 +10,16 @@ router = APIRouter(
     tags=["series"]
 )
 
+import recommender
+from typing import Optional
+from fastapi import Header
+
 @router.get("/stats")
 def get_stats(db: Session = Depends(get_db)):
     total = db.query(models.Series).count()
     completed = db.query(models.Series).filter(models.Series.status == "Completo").count()
     ongoing = db.query(models.Series).filter(models.Series.status == "Em andamento").count()
     
-    # Simple type aggregation
     types_query = db.query(models.Series.type, func.count(models.Series.type)).group_by(models.Series.type).all()
     types = {t[0]: t[1] for t in types_query}
     
@@ -26,6 +29,14 @@ def get_stats(db: Session = Depends(get_db)):
         "ongoing": ongoing,
         "types": types
     }
+
+@router.get("/recommendations")
+def get_recommendations(
+    x_profile_id: Optional[int] = Header(None, alias="X-Profile-ID"),
+    db: Session = Depends(get_db)
+):
+    rec_data = recommender.get_ml_recommendations(db, profile_id=x_profile_id, limit=18)
+    return rec_data
 
 @router.get("/", response_model=List[schemas.Series])
 def read_series(
@@ -114,7 +125,8 @@ from datetime import datetime
 
 @router.post("/", response_model=schemas.Series, status_code=status.HTTP_201_CREATED)
 def create_series(series: schemas.SeriesCreate, db: Session = Depends(get_db)):
-    db_series = models.Series(**series.dict(), created_at=datetime.now())
+    series_data = {k: v for k, v in series.dict().items() if hasattr(models.Series, k)}
+    db_series = models.Series(**series_data, created_at=datetime.now())
     db.add(db_series)
     db.commit()
     db.refresh(db_series)
@@ -127,7 +139,8 @@ def update_series(series_id: int, series: schemas.SeriesCreate, db: Session = De
         raise HTTPException(status_code=404, detail="Series not found")
     
     for key, value in series.dict().items():
-        setattr(db_series, key, value)
+        if hasattr(models.Series, key):
+            setattr(db_series, key, value)
     
     db.commit()
     db.refresh(db_series)

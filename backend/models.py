@@ -65,6 +65,7 @@ class Series(Base):
     drive_link = Column(String, nullable=True)
     mega_link = Column(String, nullable=True)
     mediafire_link = Column(String, nullable=True)
+    pixeldrain_link = Column(String, nullable=True)
     telegram_link = Column(String, nullable=True)
 
     slug = Column(String, unique=True, index=True, nullable=True)

@@ -19,11 +19,10 @@ export default function Login() {
     useEffect(() => {
         const fetchBanners = async () => {
             try {
-                const series = await api.get('/series/');
-                // Filter series that have a banner_image
-                const validBanners = series.data
-                    .filter((s: any) => s.banner_image)
-                    .map((s: any) => s.banner_image);
+                const response = await api.get('/series/?limit=100');
+                const validBanners = (response.data || [])
+                    .map((s: any) => s.banner_image)
+                    .filter((b: string) => b && (b.includes('image.tmdb.org') || b.includes('unsplash.com') || b.startsWith('http')) && !b.includes('tvtime.com'));
 
                 if (validBanners.length > 0) {
                     setBanners(validBanners);
@@ -41,7 +40,7 @@ export default function Login() {
 
         const interval = setInterval(() => {
             setCurrentBannerIndex((prev) => (prev + 1) % banners.length);
-        }, 5000); // Change every 5 seconds
+        }, 6000);
 
         return () => clearInterval(interval);
     }, [banners]);
@@ -56,7 +55,7 @@ export default function Login() {
                 login(response.data.access_token);
                 navigate('/profiles');
             } else {
-                const response = await api.post('/auth/register', { email, password, full_name: fullName }); // Send full_name
+                const response = await api.post('/auth/register', { email, password, full_name: fullName });
                 login(response.data.access_token);
                 navigate('/profiles');
             }
@@ -82,11 +81,12 @@ export default function Login() {
                         >
                             <img
                                 src={banners[currentBannerIndex]}
-                                alt="Background"
+                                alt=""
+                                onError={() => setCurrentBannerIndex((prev) => (prev + 1) % banners.length)}
                                 className="w-full h-full object-cover"
                             />
                             {/* Overlay gradient for readability */}
-                            <div className="absolute inset-0 bg-black/40" />
+                            <div className="absolute inset-0 bg-black/60" />
                         </motion.div>
                     )}
                 </AnimatePresence>
