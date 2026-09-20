@@ -2,13 +2,13 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { User, Settings, Clock, Heart, List } from 'lucide-react';
 import SeriesCard from '../components/SeriesCard';
-import api from '../services/api';
+import { fetchContinueWatching, fetchLikedSeries, fetchMyListSeries } from '../services/library';
 import { useAuth } from '../context/AuthContext';
 
 import { useNavigate } from 'react-router-dom';
 
 export default function Profile() {
-    const { logout, isAuthenticated, currentProfile, user, isLoading } = useAuth();
+    const { uid, logout, isAuthenticated, currentProfile, user, isLoading } = useAuth();
     const navigate = useNavigate();
     const [activeTab, setActiveTab] = useState<'watching' | 'likes' | 'list'>('watching');
     const [history, setHistory] = useState<any[]>([]);
@@ -26,17 +26,15 @@ export default function Profile() {
 
         const fetchProfileData = async () => {
             try {
-                // Fetch history (mock endpoint structure for now)
-                const historyRes = await api.get('/users/me/history');
-                setHistory(historyRes.data);
-
-                // Fetch my list
-                const listRes = await api.get('/users/me/list');
-                setMyList(listRes.data);
-
-                // Fetch likes
-                const likesRes = await api.get('/users/me/likes');
-                setMyLikes(likesRes.data);
+                // Continue watching, my list and likes all come from Firestore now.
+                const [historyData, listData, likesData] = await Promise.all([
+                    fetchContinueWatching(uid!, currentProfile!.id),
+                    fetchMyListSeries(uid!, currentProfile!.id),
+                    fetchLikedSeries(uid!, currentProfile!.id),
+                ]);
+                setHistory(historyData);
+                setMyList(listData);
+                setMyLikes(likesData);
 
             } catch (error) {
                 console.error("Failed to fetch profile data:", error);
@@ -46,7 +44,8 @@ export default function Profile() {
         };
 
         fetchProfileData();
-    }, [currentProfile, isAuthenticated, isLoading]); // Reload when profile changes
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [currentProfile?.id, uid, isAuthenticated, isLoading]); // Reload when profile changes
 
     const tabs = [
         { id: 'watching', label: 'Assistindo', icon: Clock },
@@ -59,8 +58,8 @@ export default function Profile() {
     }
 
     // Display info: Priority to Current Profile, then User Info
-    const displayName = currentProfile?.name || user?.full_name || user?.email || "Usuário";
-    const displayAvatar = currentProfile?.avatar_url || user?.avatar_url;
+    const displayName = currentProfile?.name || user?.displayName || user?.email || "Usuário";
+    const displayAvatar = currentProfile?.avatarUrl || user?.photoURL || undefined;
     const displayEmail = user?.email;
 
     return (

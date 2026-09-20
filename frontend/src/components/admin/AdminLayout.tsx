@@ -7,6 +7,7 @@ import {
     Tv,
     Users,
     LogOut,
+    Home,
     Menu,
     X,
     ChevronRight,
@@ -28,9 +29,14 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
     const navigate = useNavigate();
     const [sidebarOpen, setSidebarOpen] = useState(false);
 
-    const handleLogout = () => {
-        logout();
-        navigate('/login');
+    const handleLogout = async () => {
+        try {
+            await logout();
+        } catch (error) {
+            console.error('Failed to sign out', error);
+        } finally {
+            navigate('/login');
+        }
     };
 
     const SidebarContent = () => (
@@ -82,10 +88,17 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
                         </span>
                     </div>
                     <div className="min-w-0">
-                        <p className="text-white text-xs font-semibold truncate">{user?.full_name || 'Admin'}</p>
+                        <p className="text-white text-xs font-semibold truncate">{user?.displayName || 'Admin'}</p>
                         <p className="text-gray-500 text-xs truncate">{user?.email}</p>
                     </div>
                 </div>
+                <button
+                    onClick={() => navigate('/')}
+                    className="w-full flex items-center gap-2 px-3 py-2 mb-1 rounded-xl text-sm text-gray-400 hover:text-white hover:bg-white/5 transition-all"
+                >
+                    <Home className="w-4 h-4" />
+                    Voltar ao site
+                </button>
                 <button
                     onClick={handleLogout}
                     className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-sm text-gray-400 hover:text-red-400 hover:bg-red-500/10 transition-all"
@@ -141,8 +154,10 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
                     </button>
                     <span className="text-white font-bold text-sm" style={{ fontFamily: 'Cinzel, serif' }}>HuaPlay Admin</span>
                     <button
-                        onClick={() => setSidebarOpen(false)}
-                        className="ml-auto p-2 rounded-lg hover:bg-white/5 text-gray-400"
+                        onClick={() => navigate('/')}
+                        aria-label="Sair do painel e voltar ao site"
+                        title="Voltar ao site"
+                        className="ml-auto p-2 rounded-lg hover:bg-white/5 text-gray-400 hover:text-white transition-all"
                     >
                         <X className="w-5 h-5" />
                     </button>

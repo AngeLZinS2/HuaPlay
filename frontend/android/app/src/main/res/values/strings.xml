@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">HuaPlay</string>
+    <string name="title_activity_main">HuaPlay</string>
+    <string name="package_name">com.huaplay.app</string>
+    <string name="custom_url_scheme">com.huaplay.app</string>
+</resources>

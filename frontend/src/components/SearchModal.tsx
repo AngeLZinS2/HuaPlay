@@ -4,6 +4,7 @@ import { Search, X, Film, Loader2, ChevronDown } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { getSeries, type Series } from '../services/series';
 import { useModal } from '../context/ModalContext';
+import { getOptimizedImageUrl } from '../utils/image';
 
 interface SearchModalProps {
     isOpen: boolean;
@@ -40,7 +41,7 @@ export default function SearchModal({ isOpen, onClose }: SearchModalProps) {
             if (query.trim()) {
                 setLoading(true);
                 try {
-                    const data = await getSeries(query);
+                    const data = await getSeries({ search: query, limit: 20 });
                     setResults(data);
                 } catch (error) {
                     console.error('Error searching series:', error);
@@ -125,7 +126,7 @@ export default function SearchModal({ isOpen, onClose }: SearchModalProps) {
                                                     >
                                                         <div className="relative w-12 h-16 flex-shrink-0 rounded overflow-hidden bg-gray-800">
                                                             <img
-                                                                src={series.cover_image || '/placeholder-cover.jpg'}
+                                                                src={getOptimizedImageUrl(series.cover_image, 'thumbnail')}
                                                                 alt={series.title}
                                                                 className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
                                                             />

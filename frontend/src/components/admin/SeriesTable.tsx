@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Edit, Trash2, Star, List, ChevronLeft, ChevronRight } from 'lucide-react';
+import { getOptimizedImageUrl } from '../../utils/image';
 
 interface SeriesTableProps {
     seriesList: any[];
@@ -113,7 +114,7 @@ export default function SeriesTable({
                                                 }}
                                                 onMouseLeave={() => setHoveredCover(null)}
                                             >
-                                                <img src={item.cover_image} alt="" className="w-full h-full object-cover" />
+                                                <img src={getOptimizedImageUrl(item.cover_image, 'thumbnail')} alt="" className="w-full h-full object-cover" />
                                             </div>
                                         </td>
 

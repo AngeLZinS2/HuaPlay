@@ -4,8 +4,10 @@ import { Play, Plus, Check, Volume2, VolumeX } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import { addToMyList, removeFromMyList } from '../services/userData';
 import { useToast } from '../context/ToastContext';
-import { getYouTubeEmbedUrl, getYouTubeVideoId } from '../utils/youtube';
+import { getTrailerEmbed } from '../utils/trailer';
+import { getOptimizedImageUrl } from '../utils/image';
 
 export default function Hero() {
     const [featured, setFeatured] = useState<any | null>(null);
@@ -13,7 +15,7 @@ export default function Hero() {
     const [isMuted, setIsMuted] = useState(true);
     const iframeRef = useRef<HTMLIFrameElement>(null);
     const navigate = useNavigate();
-    const { myListIds, updateLists, isAuthenticated } = useAuth();
+    const { uid, currentProfile, myListIds, updateLists, isAuthenticated } = useAuth();
     const { addToast } = useToast();
 
     const isInList = featured ? myListIds.includes(featured.id) : false;
@@ -26,11 +28,12 @@ export default function Hero() {
         }
 
         try {
+            if (!uid || !currentProfile) return;
             if (isInList) {
-                await api.delete(`/users/me/list/${featured.id}`);
+                await removeFromMyList(uid, currentProfile.id, featured.id);
                 addToast('Removido da sua lista', 'info');
             } else {
-                await api.post(`/users/me/list/${featured.id}`);
+                await addToMyList(uid, currentProfile.id, featured.id);
                 addToast('Adicionado à sua lista', 'success');
             }
             await updateLists();
@@ -43,18 +46,21 @@ export default function Hero() {
     useEffect(() => {
         const fetchFeatured = async () => {
             try {
-                const response = await api.get('/series/?is_featured=true');
-                let pool = response.data;
-                if (!pool || pool.length === 0) {
-                    const fallbackRes = await api.get('/series/?limit=30');
-                    pool = (fallbackRes.data || []).filter((s: any) => s.banner_image);
-                }
-                if (pool && pool.length > 0) {
-                    const randomIndex = Math.floor(Math.random() * pool.length);
-                    setFeatured(pool[randomIndex]);
+                const response = await api.get('/series/hero-featured');
+                if (response.data) {
+                    setFeatured(response.data);
                 }
             } catch (error) {
-                console.error("Failed to fetch featured series:", error);
+                console.error("Failed to fetch hero featured series:", error);
+                try {
+                    const fallbackRes = await api.get('/series/?limit=30');
+                    const pool = (fallbackRes.data || []).filter((s: any) => s.banner_image);
+                    if (pool.length > 0) {
+                        setFeatured(pool[Math.floor(Math.random() * pool.length)]);
+                    }
+                } catch (e) {
+                    console.error("Fallback featured failed:", e);
+                }
             } finally {
                 setLoading(false);
             }
@@ -107,17 +113,28 @@ export default function Hero() {
 
 
 
+    // Single source of truth: the mute control must follow whether a trailer is
+    // actually playing, not merely whether the series has a trailer_url. A series
+    // in BANNER mode shows a still image even when it has one, and a link we
+    // cannot turn into an embed falls back to the still image too — rendering the
+    // iframe anyway is what left the banner black for non-YouTube embed links.
+    const trailer = getTrailerEmbed(featured.trailer_url, { hd: true });
+    const showsTrailer = Boolean(
+        trailer && (featured.feature_type === 'TRAILER' || !featured.feature_type),
+    );
+
     return (
         <div className="relative h-screen w-full overflow-hidden">
             {/* Background Video/Image */}
             <div className="absolute inset-0 select-none pointer-events-none">
-                {featured.trailer_url && (featured.feature_type === 'TRAILER' || !featured.feature_type) ? (
+                {showsTrailer ? (
                     <>
                         {/* Mobile: Show Image Fallback */}
-                        <div className="block md:hidden w-full h-full relative">
+                        <div className="block md:hidden w-full h-full relative bg-neutral-950">
                             <img
-                                src={featured.banner_image || featured.cover_image}
+                                src={getOptimizedImageUrl(featured.banner_image || featured.cover_image, 'backdrop')}
                                 alt={featured.title}
+                                decoding="async"
                                 className="w-full h-full object-cover"
                             />
                         </div>
@@ -126,7 +143,8 @@ export default function Hero() {
                         <div className="hidden md:block relative w-full h-full overflow-hidden">
                             <iframe
                                 ref={iframeRef}
-                                src={`${getYouTubeEmbedUrl(featured.trailer_url)}?enablejsapi=1&autoplay=1&mute=1&controls=0&modestbranding=1&loop=1&playlist=${getYouTubeVideoId(featured.trailer_url)}&vq=hd1080&playsinline=1&origin=${encodeURIComponent(window.location.origin)}`}
+                                src={trailer?.src}
+                                title={featured.title}
                                 className="absolute top-1/2 left-1/2 w-[150vw] h-[150vh] -translate-x-1/2 -translate-y-1/2 pointer-events-none object-cover"
                                 frameBorder="0"
                                 allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
@@ -137,8 +155,9 @@ export default function Hero() {
                     </>
                 ) : (
                     <img
-                        src={featured.banner_image || featured.cover_image}
+                        src={getOptimizedImageUrl(featured.banner_image || featured.cover_image, 'backdrop')}
                         alt={featured.title}
+                        decoding="async"
                         className="w-full h-full object-cover"
                     />
                 )}
@@ -205,17 +224,23 @@ export default function Hero() {
                             {isInList ? 'NA LISTA' : 'MINHA LISTA'}
                         </motion.button>
 
-                        {featured.trailer_url && (
-                            <button
-                                onClick={() => setIsMuted(!isMuted)}
-                                className="hidden md:block p-4 border border-white/10 rounded-full text-gray-400 hover:text-primary hover:border-primary/50 bg-black/60 backdrop-blur-md transition-all ml-auto"
-                            >
-                                {isMuted ? <VolumeX className="w-6 h-6" /> : <Volume2 className="w-6 h-6" />}
-                            </button>
-                        )}
                     </div>
                 </motion.div>
             </div>
+
+            {/* Mute toggle. Anchored to the hero itself rather than the text
+                column, and only rendered while the trailer is on screen — the
+                trailer is desktop-only, so the control is too. */}
+            {showsTrailer && trailer?.supportsMuteApi && (
+                <button
+                    onClick={() => setIsMuted(!isMuted)}
+                    aria-label={isMuted ? 'Ativar som do trailer' : 'Silenciar trailer'}
+                    title={isMuted ? 'Ativar som' : 'Silenciar'}
+                    className="hidden md:flex absolute bottom-28 right-6 md:right-12 lg:right-20 z-20 items-center justify-center p-4 border border-white/10 rounded-full text-gray-400 hover:text-primary hover:border-primary/50 bg-black/60 backdrop-blur-md transition-all"
+                >
+                    {isMuted ? <VolumeX className="w-6 h-6" /> : <Volume2 className="w-6 h-6" />}
+                </button>
+            )}
         </div>
     );
 }

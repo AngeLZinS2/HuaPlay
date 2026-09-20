@@ -1,5 +1,5 @@
 from typing import List, Optional
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 from datetime import datetime
 
 class Token(BaseModel):
@@ -30,7 +30,22 @@ class SeriesBase(BaseModel):
     pixeldrain_link: Optional[str] = None
 
     is_featured: bool = False
+    views_count: Optional[int] = 0
 
+    @field_validator("slug", mode="before")
+    @classmethod
+    def blank_slug_is_none(cls, value):
+        """An empty slug means "no slug", which is NULL — not "".
+
+        slug has a UNIQUE index. The admin form sends "" for a series that has
+        none, so the first save claimed the empty string and every later save
+        of another slug-less series hit the constraint. SQLite allows any number
+        of NULLs in a unique index, so normalising here fixes all of them.
+        """
+        if isinstance(value, str):
+            stripped = value.strip()
+            return stripped or None
+        return value
 
 class SeriesCreate(SeriesBase):
     pass
@@ -41,9 +56,24 @@ class Series(SeriesBase):
     class Config:
         from_attributes = True
 
+class FeaturedConfigBase(BaseModel):
+    mode: str = "MOST_WATCHED"
+    rotate_interval_minutes: int = 60
+    manual_series_id: Optional[int] = None
+
+class FeaturedConfigCreate(FeaturedConfigBase):
+    pass
+
+class FeaturedConfigResponse(FeaturedConfigBase):
+    id: int
+    manual_series: Optional[Series] = None
+    class Config:
+        from_attributes = True
+
 class EpisodeBase(BaseModel):
     title: str
     episode_number: int
+    season_number: Optional[int] = 1
     embed_url_1: Optional[str] = None
     embed_url_2: Optional[str] = None
 
@@ -79,6 +109,35 @@ class User(UserBase):
     is_admin: bool
     full_name: Optional[str] = None
     avatar_url: Optional[str] = None
+    class Config:
+        from_attributes = True
+
+class WatchHistoryCreate(BaseModel):
+    episode_id: int
+    timestamp_seconds: Optional[int] = 0
+    completed: Optional[bool] = False
+    # True when the position was inferred from time on page, not read from a player.
+    is_estimated: Optional[bool] = False
+
+class WatchHistoryEntry(BaseModel):
+    id: int
+    profile_id: int
+    episode_id: int
+    series_id: int
+    timestamp_seconds: int
+    completed: bool
+    is_estimated: bool = False
+    updated_at: Optional[datetime] = None
+    class Config:
+        from_attributes = True
+
+class EpisodeProgress(BaseModel):
+    episode_id: int
+    episode_number: int
+    timestamp_seconds: int
+    completed: bool
+    is_estimated: bool = False
+    updated_at: Optional[datetime] = None
     class Config:
         from_attributes = True
 

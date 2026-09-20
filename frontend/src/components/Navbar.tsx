@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Search, User, Menu, X, ChevronDown, Edit, Repeat, HelpCircle } from 'lucide-react';
+import { Search, User, Menu, X, ChevronDown, Edit, Repeat, HelpCircle, Shield } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import SearchModal from './SearchModal';
 import { useAuth } from '../context/AuthContext';
@@ -36,9 +36,22 @@ const navigation = [
 ];
 
 export default function Navbar() {
-    const { isAuthenticated, profiles, currentProfile, selectProfile, logout } = useAuth();
+    const { isAuthenticated, isAdmin, profiles, currentProfile, selectProfile, logout } = useAuth();
     const [isScrolled, setIsScrolled] = useState(false);
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
+    // Firebase writes the signed-out state to storage asynchronously; navigating
+    // before it settles can leave the session alive.
+    const handleSignOut = async () => {
+        try {
+            await logout();
+        } catch (error) {
+            console.error('Failed to sign out', error);
+        } finally {
+            setIsMobileMenuOpen(false);
+            window.location.href = '/login';
+        }
+    };
     const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
     const [isSearchOpen, setIsSearchOpen] = useState(false);
 
@@ -143,7 +156,7 @@ export default function Navbar() {
                                 <div className="flex items-center gap-2 cursor-pointer py-2">
                                     <div className={`w-8 h-8 rounded-md overflow-hidden border transition-colors ${activeDropdown === 'profile' ? 'border-white' : 'border-transparent'}`}>
                                         <img
-                                            src={currentProfile?.avatar_url || "https://wallpapers.com/images/hd/netflix-profile-pictures-1000-x-1000-qo9h82134t9nv0j0.jpg"}
+                                            src={currentProfile?.avatarUrl || "https://wallpapers.com/images/hd/netflix-profile-pictures-1000-x-1000-qo9h82134t9nv0j0.jpg"}
                                             alt="Profile"
                                             className="w-full h-full object-cover"
                                         />
@@ -176,7 +189,7 @@ export default function Navbar() {
                                                             className="flex items-center gap-3 cursor-pointer group/item"
                                                         >
                                                             <img
-                                                                src={profile.avatar_url || "https://wallpapers.com/images/hd/netflix-profile-pictures-1000-x-1000-qo9h82134t9nv0j0.jpg"}
+                                                                src={profile.avatarUrl || "https://wallpapers.com/images/hd/netflix-profile-pictures-1000-x-1000-qo9h82134t9nv0j0.jpg"}
                                                                 alt={profile.name}
                                                                 className="w-8 h-8 rounded-md object-cover opacity-80 group-hover/item:opacity-100"
                                                             />
@@ -204,10 +217,7 @@ export default function Navbar() {
                                                 {/* Logout */}
                                                 <div className="border-t border-white/10 p-3">
                                                     <button
-                                                        onClick={() => {
-                                                            logout();
-                                                            window.location.href = '/login';
-                                                        }}
+                                                        onClick={handleSignOut}
                                                         className="w-full text-center text-xs font-semibold text-white hover:underline"
                                                     >
                                                         Sair da HuaPlay
@@ -249,7 +259,7 @@ export default function Navbar() {
                                 >
                                     <div className={`w-8 h-8 rounded-md overflow-hidden border transition-colors ${activeDropdown === 'mobile-profile' ? 'border-white' : 'border-transparent'}`}>
                                         <img
-                                            src={currentProfile?.avatar_url || "https://wallpapers.com/images/hd/netflix-profile-pictures-1000-x-1000-qo9h82134t9nv0j0.jpg"}
+                                            src={currentProfile?.avatarUrl || "https://wallpapers.com/images/hd/netflix-profile-pictures-1000-x-1000-qo9h82134t9nv0j0.jpg"}
                                             alt="Profile"
                                             className="w-full h-full object-cover"
                                         />
@@ -276,7 +286,7 @@ export default function Navbar() {
                                                             className="flex items-center gap-3 cursor-pointer group/item"
                                                         >
                                                             <img
-                                                                src={profile.avatar_url}
+                                                                src={profile.avatarUrl ?? undefined}
                                                                 alt={profile.name}
                                                                 className="w-7 h-7 rounded-md object-cover opacity-80"
                                                             />
@@ -294,10 +304,7 @@ export default function Navbar() {
                                                 </div>
                                                 <div className="border-t border-white/10 p-3">
                                                     <button
-                                                        onClick={() => {
-                                                            logout();
-                                                            window.location.href = '/login';
-                                                        }}
+                                                        onClick={handleSignOut}
                                                         className="w-full text-center text-xs font-semibold text-white hover:underline"
                                                     >
                                                         Sair da HuaPlay
@@ -315,10 +322,12 @@ export default function Navbar() {
                         )}
 
                         <button
-                            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+                            onClick={() => setIsMobileMenuOpen(true)}
+                            aria-label="Abrir menu"
+                            aria-expanded={isMobileMenuOpen}
                             className="text-gray-300 hover:text-white"
                         >
-                            {isMobileMenuOpen ? <X /> : <Menu />}
+                            <Menu />
                         </button>
                     </div>
                 </div>
@@ -332,14 +341,15 @@ export default function Navbar() {
                         animate={{ opacity: 1, x: 0 }}
                         exit={{ opacity: 0, x: '100%' }}
                         transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-                        className="fixed inset-0 z-40 md:hidden bg-black/95 backdrop-blur-xl h-[100dvh] overflow-y-auto"
+                        className="fixed inset-0 z-[60] md:hidden bg-black/95 backdrop-blur-xl h-[100dvh] overflow-y-auto"
                     >
                         <div className="flex flex-col pt-6 px-6 space-y-6 pb-32">
-                            <div className="flex justify-between items-center mb-8">
+                            <div className="flex justify-between items-center mb-8 h-14">
                                 <span className="text-xl font-display font-bold text-primary">MENU</span>
                                 <button
                                     onClick={() => setIsMobileMenuOpen(false)}
-                                    className="p-2 border border-white/20 rounded-full text-white hover:bg-white/10"
+                                    aria-label="Fechar menu"
+                                    className="p-2 border border-white/20 rounded-full text-white hover:bg-white/10 transition-colors"
                                 >
                                     <X className="w-6 h-6" />
                                 </button>
@@ -375,13 +385,66 @@ export default function Navbar() {
                                     )}
                                 </motion.div>
                             ))}
-                            <div className="pt-6 border-t border-white/10 flex gap-4">
-                                <Link to="/login" className="px-6 py-2 border border-white/20 rounded-full text-white hover:bg-white hover:text-black transition-all">
-                                    Login
-                                </Link>
-                                <Link to="/register" className="px-6 py-2 bg-primary text-black font-bold rounded-full hover:brightness-110 transition-all">
-                                    Cadastrar
-                                </Link>
+                            <div className="pt-6 border-t border-white/10">
+                                {isAuthenticated ? (
+                                    <div className="space-y-3">
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-9 h-9 rounded-md overflow-hidden border border-white/20 flex-shrink-0">
+                                                <img
+                                                    src={currentProfile?.avatarUrl ?? undefined}
+                                                    alt={currentProfile?.name ?? 'Perfil'}
+                                                    className="w-full h-full object-cover"
+                                                />
+                                            </div>
+                                            <div className="min-w-0">
+                                                <p className="text-sm text-white font-semibold truncate">
+                                                    {currentProfile?.name ?? 'Meu perfil'}
+                                                </p>
+                                                <Link
+                                                    to="/profiles"
+                                                    onClick={() => setIsMobileMenuOpen(false)}
+                                                    className="text-xs text-gray-400 hover:text-white transition-colors"
+                                                >
+                                                    Trocar de perfil
+                                                </Link>
+                                            </div>
+                                        </div>
+                                        {isAdmin && (
+                                            <Link
+                                                to="/admin"
+                                                onClick={() => setIsMobileMenuOpen(false)}
+                                                className="flex items-center justify-center gap-2 w-full px-6 py-2 rounded-full bg-yellow-500/10 border border-yellow-500/40 text-yellow-400 font-semibold hover:bg-yellow-500/20 transition-all"
+                                            >
+                                                <Shield className="w-4 h-4" />
+                                                Painel Admin
+                                            </Link>
+                                        )}
+                                        <button
+                                            onClick={handleSignOut}
+                                            className="w-full px-6 py-2 border border-white/20 rounded-full text-white hover:bg-white hover:text-black transition-all"
+                                        >
+                                            Sair
+                                        </button>
+                                    </div>
+                                ) : (
+                                    <div className="flex gap-4">
+                                        <Link
+                                            to="/login"
+                                            onClick={() => setIsMobileMenuOpen(false)}
+                                            className="px-6 py-2 border border-white/20 rounded-full text-white hover:bg-white hover:text-black transition-all"
+                                        >
+                                            Login
+                                        </Link>
+                                        {/* There is no /register route — the login page toggles to sign-up. */}
+                                        <Link
+                                            to="/login"
+                                            onClick={() => setIsMobileMenuOpen(false)}
+                                            className="px-6 py-2 bg-primary text-black font-bold rounded-full hover:brightness-110 transition-all"
+                                        >
+                                            Cadastrar
+                                        </Link>
+                                    </div>
+                                )}
                             </div>
                         </div>
                     </motion.div>

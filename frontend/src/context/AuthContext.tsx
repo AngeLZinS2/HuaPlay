@@ -1,145 +1,197 @@
-import { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
-import api from '../services/api';
-
-interface UserProfile {
-    id: number;
-    name: string;
-    avatar_url: string;
-}
+import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
+import {
+    GoogleAuthProvider,
+    createUserWithEmailAndPassword,
+    onAuthStateChanged,
+    signInWithEmailAndPassword,
+    signInWithPopup,
+    signOut,
+    updateProfile as updateAuthProfile,
+    type User,
+} from 'firebase/auth';
+import { auth, googleProvider } from '../services/firebase';
+import { getBackendIdentity } from '../services/api';
+import {
+    ensureUserDoc,
+    listLikes,
+    listMyList,
+    listOrCreateProfiles,
+    type UserProfile,
+} from '../services/userData';
 
 interface AuthContextType {
-    user: any | null;
+    user: User | null;
+    /** Firebase uid, or null when signed out. */
+    uid: string | null;
+    isAdmin: boolean;
     profiles: UserProfile[];
     currentProfile: UserProfile | null;
-    login: (token: string) => void;
-    logout: () => void;
-    selectProfile: (profile: UserProfile) => void;
-    fetchProfiles: () => Promise<void>;
     isAuthenticated: boolean;
     isLoading: boolean;
     myListIds: number[];
     myLikeIds: number[];
+    signInWithEmail: (email: string, password: string) => Promise<void>;
+    registerWithEmail: (email: string, password: string, fullName?: string) => Promise<void>;
+    signInWithGoogle: () => Promise<void>;
+    logout: () => Promise<void>;
+    selectProfile: (profile: UserProfile) => void;
+    fetchProfiles: () => Promise<void>;
     updateLists: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+const PROFILE_KEY = 'current_profile_id';
+
 export function AuthProvider({ children }: { children: ReactNode }) {
-    const [user, setUser] = useState<any | null>(null);
+    const [user, setUser] = useState<User | null>(null);
+    const [isAdmin, setIsAdmin] = useState(false);
     const [profiles, setProfiles] = useState<UserProfile[]>([]);
     const [currentProfile, setCurrentProfile] = useState<UserProfile | null>(null);
-    const [isAuthenticated, setIsAuthenticated] = useState(false);
     const [isLoading, setIsLoading] = useState(true);
     const [myListIds, setMyListIds] = useState<number[]>([]);
     const [myLikeIds, setMyLikeIds] = useState<number[]>([]);
 
-    useEffect(() => {
-        const token = localStorage.getItem('token');
-        if (token) {
-            setIsAuthenticated(true);
-            refreshUserData();
-        } else {
-            setIsLoading(false);
-        }
-    }, []);
+    const uid = user?.uid ?? null;
 
-    const fetchProfiles = async () => {
+    const updateLists = useCallback(async () => {
+        if (!uid || !currentProfile) {
+            setMyListIds([]);
+            setMyLikeIds([]);
+            return;
+        }
         try {
-            const res = await api.get('/users/profiles');
-            const list = res.data || [];
+            const [list, likes] = await Promise.all([
+                listMyList(uid, currentProfile.id),
+                listLikes(uid, currentProfile.id),
+            ]);
+            setMyListIds(list);
+            setMyLikeIds(likes);
+        } catch (error) {
+            console.error('Failed to load list/likes from Firestore', error);
+        }
+    }, [uid, currentProfile]);
+
+    const fetchProfiles = useCallback(async () => {
+        if (!user) return;
+        try {
+            const list = await listOrCreateProfiles(user);
             setProfiles(list);
 
-            const storedProfileId = localStorage.getItem('current_profile_id');
-            let profileToSelect = null;
-            if (storedProfileId && list.length > 0) {
-                profileToSelect = list.find((p: any) => p.id === parseInt(storedProfileId));
-            }
-            if (!profileToSelect && list.length > 0) {
-                profileToSelect = list[0];
-            }
-
-            if (profileToSelect) {
-                setCurrentProfile(profileToSelect);
-                localStorage.setItem('current_profile_id', profileToSelect.id.toString());
-            }
+            const storedId = localStorage.getItem(PROFILE_KEY);
+            const selected = list.find((p) => p.id === storedId) ?? list[0] ?? null;
+            setCurrentProfile(selected);
+            if (selected) localStorage.setItem(PROFILE_KEY, selected.id);
         } catch (error) {
-            console.error("Failed to fetch profiles", error);
+            console.error('Failed to load profiles from Firestore', error);
         }
-    };
+    }, [user]);
 
-    const refreshUserData = async () => {
-        try {
-            const userRes = await api.get('/users/me');
-            setUser(userRes.data);
-            await fetchProfiles();
-            await updateLists();
-        } catch (error: any) {
-            console.error("Failed to fetch user data", error);
-            if (error.response && (error.response.status === 401 || error.response.status === 403)) {
-                logout();
+    // Firebase owns the session: it restores it from storage and refreshes the
+    // ID token on its own, so there is no token handling left in this app.
+    useEffect(() => {
+        return onAuthStateChanged(auth, async (fbUser) => {
+            setUser(fbUser);
+            if (!fbUser) {
+                setIsAdmin(false);
+                setProfiles([]);
+                setCurrentProfile(null);
+                setMyListIds([]);
+                setMyLikeIds([]);
+                localStorage.removeItem(PROFILE_KEY);
+                setIsLoading(false);
+                return;
             }
-        } finally {
-            setIsLoading(false);
+            try {
+                await ensureUserDoc(fbUser);
+            } catch (error) {
+                console.error('Failed to create the Firestore user document', error);
+            }
+            try {
+                // Only the catalog backend can say whether this identity is an
+                // admin — never a client-held value, which the user could edit.
+                const identity = await getBackendIdentity();
+                setIsAdmin(identity.is_admin);
+            } catch (error) {
+                console.error('Failed to resolve admin status', error);
+                setIsAdmin(false);
+            } finally {
+                setIsLoading(false);
+            }
+        });
+    }, []);
+
+    useEffect(() => {
+        if (user) void fetchProfiles();
+    }, [user, fetchProfiles]);
+
+    useEffect(() => {
+        void updateLists();
+    }, [updateLists]);
+
+    const signInWithEmail = async (email: string, password: string) => {
+        await signInWithEmailAndPassword(auth, email, password);
+    };
+
+    /** Sign-in already succeeded here; a failed profile write must not undo it. */
+    const seedUserDoc = async (fbUser: User) => {
+        try {
+            await ensureUserDoc(fbUser);
+        } catch (error) {
+            console.error('Firestore: failed to write the user document', error);
         }
     };
 
-    const login = async (token: string) => {
-        localStorage.setItem('token', token);
-        setIsAuthenticated(true);
-        await refreshUserData();
+    const registerWithEmail = async (email: string, password: string, fullName?: string) => {
+        const cred = await createUserWithEmailAndPassword(auth, email, password);
+        if (fullName) {
+            await updateAuthProfile(cred.user, { displayName: fullName });
+        }
+        await seedUserDoc(cred.user);
     };
 
-    const logout = () => {
-        localStorage.removeItem('token');
-        localStorage.removeItem('current_profile_id');
-        setIsAuthenticated(false);
-        setUser(null);
-        setProfiles([]);
-        setCurrentProfile(null);
-        setMyListIds([]);
-        setMyLikeIds([]);
+    const signInWithGoogle = async () => {
+        const result = await signInWithPopup(auth, googleProvider);
+        GoogleAuthProvider.credentialFromResult(result);
+        await seedUserDoc(result.user);
     };
 
-    const selectProfile = async (profile: UserProfile) => {
+    const logout = async () => {
+        await signOut(auth);
+    };
+
+    const selectProfile = (profile: UserProfile) => {
         setCurrentProfile(profile);
-        localStorage.setItem('current_profile_id', profile.id.toString());
-        // Reload lists for this profile
-        await updateLists();
+        localStorage.setItem(PROFILE_KEY, profile.id);
     };
-
-    const updateLists = async () => {
-        try {
-            const [listRes, likesRes] = await Promise.all([
-                api.get('/users/me/list'),
-                api.get('/users/me/likes')
-            ]);
-            setMyListIds(listRes.data.map((item: any) => item.id));
-            setMyLikeIds(likesRes.data.map((item: any) => item.id));
-        } catch (error) {
-            console.error("Failed to update lists", error);
-        }
-    }
 
     return (
-        <AuthContext.Provider value={{
-            user,
-            profiles,
-            currentProfile,
-            login,
-            logout,
-            selectProfile,
-            fetchProfiles,
-            isAuthenticated,
-            isLoading,
-            myListIds,
-            myLikeIds,
-            updateLists
-        }}>
+        <AuthContext.Provider
+            value={{
+                user,
+                uid,
+                isAdmin,
+                profiles,
+                currentProfile,
+                isAuthenticated: !!user,
+                isLoading,
+                myListIds,
+                myLikeIds,
+                signInWithEmail,
+                registerWithEmail,
+                signInWithGoogle,
+                logout,
+                selectProfile,
+                fetchProfiles,
+                updateLists,
+            }}
+        >
             {children}
         </AuthContext.Provider>
     );
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function useAuth() {
     const context = useContext(AuthContext);
     if (context === undefined) {
@@ -147,4 +199,3 @@ export function useAuth() {
     }
     return context;
 }
-

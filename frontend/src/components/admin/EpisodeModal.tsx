@@ -94,7 +94,19 @@ export default function EpisodeModal({
                                 </select>
                             </div>
 
-                            <div className="grid grid-cols-2 gap-4">
+                            <div className="grid grid-cols-3 gap-4">
+                                <div>
+                                    <label className={labelClass}>Temporada</label>
+                                    <input
+                                        type="number"
+                                        min={0}
+                                        value={episodeData.season_number ?? 1}
+                                        onChange={(e) => update('season_number', parseInt(e.target.value))}
+                                        className={inputClass}
+                                        title="0 para especiais e OVAs"
+                                        required
+                                    />
+                                </div>
                                 <div>
                                     <label className={labelClass}>Número do Episódio</label>
                                     <input

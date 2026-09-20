@@ -3,9 +3,10 @@ import { motion } from 'framer-motion';
 import { Play, Plus, Check, ThumbsUp, ChevronDown } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { addToList, removeFromList, likeSeries, unlikeSeries } from '../services/api';
+import { addToMyList, removeFromMyList, likeSeries, unlikeSeries } from '../services/userData';
 import { useToast } from '../context/ToastContext';
-import { getYouTubeEmbedUrl, getYouTubeVideoId } from '../utils/youtube';
+import { getTrailerEmbed } from '../utils/trailer';
+import { getOptimizedImageUrl } from '../utils/image';
 
 interface SeriesCardProps {
     item: any;
@@ -18,10 +19,15 @@ interface SeriesCardProps {
 export default function SeriesCard({ item, onOpenModal, isFirst, isLast, variant = 'default' }: SeriesCardProps) {
     const [isHovered, setIsHovered] = useState(false);
     const [showTrailer, setShowTrailer] = useState(false);
+    const [imageLoaded, setImageLoaded] = useState(false);
+    const [imageError, setImageError] = useState(false);
     const timeoutRef = useRef<any>(null);
     const navigate = useNavigate();
-    const { isAuthenticated, myListIds, myLikeIds, updateLists } = useAuth();
+    const { uid, currentProfile, isAuthenticated, myListIds, myLikeIds, updateLists } = useAuth();
     const { addToast } = useToast();
+    // null when the link cannot be embedded, so the hover preview keeps the
+    // poster instead of swapping in a dead iframe.
+    const trailer = getTrailerEmbed(item.trailer_url);
 
     const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
 
@@ -71,10 +77,10 @@ export default function SeriesCard({ item, onOpenModal, isFirst, isLast, variant
 
         try {
             if (previousState) {
-                await removeFromList(item.id);
+                await removeFromMyList(uid!, currentProfile!.id, item.id);
                 addToast('Removido da sua lista', 'success');
             } else {
-                await addToList(item.id);
+                await addToMyList(uid!, currentProfile!.id, item.id);
                 addToast('Adicionado à sua lista', 'success');
             }
             updateLists(); // Background sync
@@ -96,9 +102,9 @@ export default function SeriesCard({ item, onOpenModal, isFirst, isLast, variant
 
         try {
             if (previousState) {
-                await unlikeSeries(item.id);
+                await unlikeSeries(uid!, currentProfile!.id, item.id);
             } else {
-                await likeSeries(item.id);
+                await likeSeries(uid!, currentProfile!.id, item.id);
                 addToast('Marcado como Gostei', 'success');
             }
             updateLists();
@@ -141,10 +147,17 @@ export default function SeriesCard({ item, onOpenModal, isFirst, isLast, variant
                 transition={{ duration: 0.3, ease: 'easeInOut' }}
             >
                 {/* Media Container */}
-                <div className={`relative w-full ${showTrailer && !isMobile ? 'aspect-video' : 'h-full'} bg-black transition-all duration-300 overflow-hidden`}>
-                    {showTrailer && !isMobile && item.trailer_url && getYouTubeEmbedUrl(item.trailer_url) ? (
+                <div className={`relative w-full ${showTrailer && !isMobile ? 'aspect-video' : 'h-full'} bg-neutral-900 transition-all duration-300 overflow-hidden`}>
+                    {/* Skeleton loader while image is fetching */}
+                    {!imageLoaded && !showTrailer && (
+                        <div className="absolute inset-0 bg-neutral-900 animate-pulse flex items-center justify-center">
+                            <div className="w-8 h-8 border-2 border-yellow-500/40 border-t-yellow-500 rounded-full animate-spin" />
+                        </div>
+                    )}
+
+                    {showTrailer && !isMobile && trailer ? (
                         <iframe
-                            src={`${getYouTubeEmbedUrl(item.trailer_url)}?origin=${encodeURIComponent(window.location.origin)}&autoplay=1&mute=1&controls=0&modestbranding=1&loop=1&playlist=${getYouTubeVideoId(item.trailer_url)}`}
+                            src={trailer.src}
                             className="w-full h-full object-cover pointer-events-none scale-[1.50]"
                             frameBorder="0"
                             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
@@ -153,8 +166,15 @@ export default function SeriesCard({ item, onOpenModal, isFirst, isLast, variant
                         />
                     ) : (
                         <img
-                            src={item.cover_image || item.image}
+                            src={imageError ? (item.banner_image || "https://images.unsplash.com/photo-1536440136628-849c177e76a1?q=80&w=600&auto=format&fit=crop") : getOptimizedImageUrl(item.cover_image || item.image, 'poster')}
                             alt={item.title}
+                            loading="lazy"
+                            decoding="async"
+                            onLoad={() => setImageLoaded(true)}
+                            onError={() => {
+                                setImageError(true);
+                                setImageLoaded(true);
+                            }}
                             className="w-full h-full object-cover"
                         />
                     )}

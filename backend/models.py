@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, DateTime, Text, func
+from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, DateTime, Text, func, Index
 from sqlalchemy.orm import relationship
 from datetime import datetime
 from database import Base
@@ -70,6 +70,7 @@ class Series(Base):
 
     slug = Column(String, unique=True, index=True, nullable=True)
     is_featured = Column(Boolean, default=False) # Only one series should be true
+    views_count = Column(Integer, default=0)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     episodes = relationship("Episode", back_populates="series", cascade="all, delete-orphan")
@@ -77,12 +78,21 @@ class Series(Base):
 
 class Episode(Base):
     __tablename__ = "episodes"
+    # Covers "episodes of a series, ordered by season then number" — the hottest
+    # read in the app.
+    __table_args__ = (
+        Index("ix_episodes_series_season_number", "series_id", "season_number", "episode_number"),
+    )
 
     id = Column(Integer, primary_key=True, index=True)
     series_id = Column(Integer, ForeignKey("series.id"))
     title = Column(String, index=True)
     episode_number = Column(Integer, index=True)
-    
+    # Seasons of one show used to be stored as separate Series rows, which made
+    # the recommender treat them as different works and repeat them on the home
+    # page. 0 is reserved for specials and OVAs, as TMDb and Plex do.
+    season_number = Column(Integer, default=1)
+
     # Content links
     embed_url_1 = Column(String, nullable=True)
     embed_url_2 = Column(String, nullable=True)
@@ -104,12 +114,18 @@ class Episode(Base):
 
 class WatchHistory(Base):
     __tablename__ = "watch_history"
+    # Lookup key for the per-episode upsert and the per-profile history listing.
+    __table_args__ = (Index("ix_watch_history_profile_episode", "profile_id", "episode_id"),)
 
     id = Column(Integer, primary_key=True, index=True)
     profile_id = Column(Integer, ForeignKey("user_profiles.id"))
     episode_id = Column(Integer, ForeignKey("episodes.id"))
     timestamp_seconds = Column(Integer, default=0) # Last watched position
     completed = Column(Boolean, default=False)
+    # True when timestamp_seconds was inferred from time spent on the page rather
+    # than read from a real player. Providers other than YouTube expose no API, so
+    # their positions are estimates and the UI must not present them as exact.
+    is_estimated = Column(Boolean, default=False)
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
     profile = relationship("UserProfile", back_populates="watch_history")
@@ -147,3 +163,14 @@ class Actor(Base):
     birth_date = Column(String, nullable=True)
     social_media = Column(String, nullable=True)  # JSON string
     created_at = Column(DateTime, default=datetime.utcnow)
+
+class FeaturedConfig(Base):
+    __tablename__ = "featured_config"
+
+    id = Column(Integer, primary_key=True, default=1)
+    mode = Column(String, default="MOST_WATCHED")  # "MOST_WATCHED", "RANDOM_ROTATE", "MANUAL"
+    rotate_interval_minutes = Column(Integer, default=60)  # Rotation interval in minutes (60 = 1 hour)
+    manual_series_id = Column(Integer, ForeignKey("series.id"), nullable=True)
+
+    manual_series = relationship("Series")
+

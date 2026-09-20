@@ -1,22 +1,57 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Play, Download, Star, Share2 } from 'lucide-react';
+import { Play, Download, Star, Share2, Check, History } from 'lucide-react';
 import VideoPlayer from '../components/VideoPlayer';
 import api from '../services/api';
+import { getSeriesProgress, recordWatch, type WatchEntry } from '../services/userData';
+import { useAuth } from '../context/AuthContext';
+import type { Episode, Series } from '../types/models';
+import { isPixeldrainUrl } from '../utils/pixeldrain';
+import { PREFER_NATIVE_PIXELDRAIN } from '../config';
+import { useVisibleElapsed } from '../hooks/useVisibleElapsed';
 import { getYouTubeEmbedUrl } from '../utils/youtube';
+import { getOptimizedImageUrl } from '../utils/image';
 
 export default function SeriesDetail() {
     const { id } = useParams();
-    const [series, setSeries] = useState<any | null>(null);
-    const [episodes, setEpisodes] = useState<any[]>([]);
-    const [selectedEpisode, setSelectedEpisode] = useState<any | null>(null);
+    const [series, setSeries] = useState<Series | null>(null);
+    const [episodes, setEpisodes] = useState<Episode[]>([]);
+    const [selectedEpisode, setSelectedEpisode] = useState<Episode | null>(null);
     const [useAlternativeLink, setUseAlternativeLink] = useState(false);
     const [loading, setLoading] = useState(true);
     const [activeSource, setActiveSource] = useState<string>('');
+    const { uid, currentProfile, isAuthenticated } = useAuth();
+    const playerRef = useRef<HTMLDivElement>(null);
+
+    const [progress, setProgress] = useState<Record<number, WatchEntry>>({});
+    const [selectedSeason, setSelectedSeason] = useState<number | null>(null);
+    const { elapsed, reset: resetElapsed } = useVisibleElapsed();
+    const trackedEpisodeRef = useRef<Episode | null>(null);
+
+    // Fire-and-forget: a failed history write must never block playback.
+    // Anonymous visitors are skipped — a 401 here would trigger the global
+    // interceptor in api.ts and bounce them to /login mid-episode.
+    const recordHistory = (ep: Episode | null, seconds = 0, completed = false, isEstimated = false) => {
+        if (!isAuthenticated || !uid || !currentProfile || !ep?.id || !series?.id) return;
+        const entry: Omit<WatchEntry, 'updatedAt'> = {
+            episodeId: ep.id,
+            seriesId: series.id,
+            episodeNumber: ep.episode_number,
+            timestampSeconds: seconds,
+            completed,
+            isEstimated,
+        };
+        // Optimistic: the UI must not wait on a round trip to Firestore to show
+        // the marker, and a failed write is logged rather than surfaced mid-episode.
+        setProgress((prev) => ({ ...prev, [ep.id]: entry }));
+        recordWatch(uid, currentProfile.id, entry).catch((err) =>
+            console.error('Failed to record watch history:', err),
+        );
+    };
 
     // Helper to transform common file host links to embeddable versions
-    const transformToEmbed = (url: string, type: 'drive' | 'pixeldrain' | 'mega' | 'youtube') => {
+    const transformToEmbed = (url: string | null | undefined, type: 'drive' | 'pixeldrain' | 'mega' | 'youtube') => {
         if (!url) return '';
         if (type === 'drive') {
             const idMatch = url.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
@@ -41,8 +76,13 @@ export default function SeriesDetail() {
         return url;
     };
 
-    const getBestEmbedSource = (ep: any) => {
+    const getBestEmbedSource = (ep: Episode | null) => {
         if (!ep) return '';
+        // Pixeldrain plays through the native <video>, which is the only source
+        // that gives resume and watched markers for the bulk of the catalog.
+        if (PREFER_NATIVE_PIXELDRAIN && ep.pixeldrain_link) {
+            return transformToEmbed(ep.pixeldrain_link, 'pixeldrain');
+        }
         if (ep.embed_url_1) {
             if (ep.embed_url_1.includes('youtu')) return transformToEmbed(ep.embed_url_1, 'youtube');
             return ep.embed_url_1;
@@ -67,6 +107,7 @@ export default function SeriesDetail() {
                 if (episodesRes.data.length > 0) {
                     const firstEp = episodesRes.data[0];
                     setSelectedEpisode(firstEp);
+                    setSelectedSeason(firstEp.season_number ?? 1);
                     setActiveSource(getBestEmbedSource(firstEp));
                 }
             } catch (error) {
@@ -81,12 +122,99 @@ export default function SeriesDetail() {
         }
     }, [id]);
 
+    // For sources with no player API, persist the estimated position every 30s
+    // and once more on the way out. YouTube reports real positions instead, so
+    // it opts out of the estimator entirely.
+    useEffect(() => {
+        if (!isAuthenticated) return;
+        const exact = activeSource.includes('youtube.com/embed/');
+        if (exact) return;
+
+        const flush = () => {
+            const ep = trackedEpisodeRef.current;
+            if (!ep) return;
+            const seconds = elapsed();
+            if (seconds > 30) recordHistory(ep, seconds, false, true);
+        };
+        const timer = setInterval(flush, 30_000);
+        return () => {
+            clearInterval(timer);
+            flush();
+        };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [isAuthenticated, activeSource, selectedEpisode?.id]);
+
+    // Saved positions drive the resume point and the watched markers.
+    useEffect(() => {
+        if (!isAuthenticated || !uid || !currentProfile || !series?.id) {
+            setProgress({});
+            return;
+        }
+        getSeriesProgress(uid, currentProfile.id, series.id)
+            .then((rows) => setProgress(Object.fromEntries(rows.map((r) => [r.episodeId, r]))))
+            .catch((err) => console.error('Failed to load watch progress:', err));
+    }, [isAuthenticated, uid, currentProfile, series?.id]);
+
+    /** "23min" or "1h05" — deliberately coarse, since most values are estimates. */
+    const formatPosition = (seconds: number) => {
+        const mins = Math.floor(seconds / 60);
+        if (mins < 60) return `${mins}min`;
+        return `${Math.floor(mins / 60)}h${String(mins % 60).padStart(2, '0')}`;
+    };
+
+    // Most recently touched episode of this series, for the resume banner.
+    const lastWatched = Object.values(progress).sort((a, b) =>
+        (b.updatedAt?.toMillis() ?? 0) - (a.updatedAt?.toMillis() ?? 0),
+    )[0];
+
+    // Seasons of one show used to be separate series records; they are now one
+    // record with season_number on each episode. 0 is reserved for specials.
+    const seasons = [...new Set(episodes.map((e) => e.season_number ?? 1))].sort(
+        (a, b) => (a === 0 ? 1 : b === 0 ? -1 : 0) || a - b,
+    );
+    const activeSeason = selectedSeason ?? seasons[0] ?? 1;
+    const visibleEpisodes = episodes.filter((e) => (e.season_number ?? 1) === activeSeason);
+    const seasonLabel = (n: number) => (n === 0 ? 'Especiais' : `Temporada ${n}`);
+
+    // Resume where the viewer stopped. YouTube honours ?start=; other providers
+    // have no equivalent, so they simply restart from the beginning.
+    /** Seconds to resume from, or 0. Consumed by the native player. */
+    const resumeSecondsFor = (ep: Episode | null) => {
+        const saved = ep ? progress[ep.id] : undefined;
+        if (!saved || saved.completed || saved.timestampSeconds < 10) return 0;
+        return saved.timestampSeconds;
+    };
+
+    const withResume = (url: string, ep: Episode | null) => {
+        const saved = ep ? progress[ep.id] : undefined;
+        if (!url || !saved || saved.completed || saved.timestampSeconds < 10) return url;
+        if (!url.includes('youtube.com/embed/')) return url;
+        try {
+            const parsed = new URL(url);
+            parsed.searchParams.set('start', String(saved.timestampSeconds));
+            return parsed.toString();
+        } catch {
+            return url;
+        }
+    };
+
     // Reset source when episode changes
-    const handleEpisodeSelect = (ep: any) => {
+    const handleEpisodeSelect = (ep: Episode) => {
         setSelectedEpisode(ep);
+        setSelectedSeason(ep.season_number ?? 1);
         setUseAlternativeLink(false);
         setActiveSource(getBestEmbedSource(ep));
-        window.scrollTo({ top: 0, behavior: 'smooth' });
+        trackedEpisodeRef.current = ep;
+        resetElapsed(progress[ep.id]?.completed ? 0 : progress[ep.id]?.timestampSeconds ?? 0);
+        recordHistory(ep);
+        playerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    };
+
+    // "Assistir" starts the currently selected episode (the first one by default).
+    const handleWatch = () => {
+        if (!selectedEpisode) return;
+        recordHistory(selectedEpisode);
+        playerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     };
 
     if (loading) {
@@ -107,7 +235,7 @@ export default function SeriesDetail() {
             <div className="relative min-h-[85vh] md:min-h-[75vh] w-full flex items-end pt-28">
                 <div
                     className="absolute inset-0 bg-cover bg-center"
-                    style={{ backgroundImage: `url(${series.banner_image || series.cover_image})` }}
+                    style={{ backgroundImage: `url(${getOptimizedImageUrl(series.banner_image || series.cover_image, 'backdrop')})` }}
                 >
                     <div className="absolute inset-0 bg-gradient-to-t from-background via-background/60 to-transparent" />
                     <div className="absolute top-0 left-0 right-0 h-40 bg-gradient-to-b from-black/90 via-black/50 to-transparent z-10" />
@@ -117,9 +245,9 @@ export default function SeriesDetail() {
                     <motion.img
                         initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}
-                        src={series.cover_image}
+                        src={getOptimizedImageUrl(series.cover_image || series.banner_image, 'poster')}
                         alt={series.title}
-                        className="w-48 lg:w-64 rounded-lg shadow-2xl hidden md:block"
+                        className="w-48 lg:w-64 rounded-lg shadow-2xl hidden md:block object-cover"
                     />
 
                     <div className="space-y-4 mb-4">
@@ -144,7 +272,11 @@ export default function SeriesDetail() {
                         </p>
 
                         <div className="flex gap-4 pt-4">
-                            <button className="flex items-center gap-2 px-6 py-2 bg-primary hover:bg-red-700 text-white rounded-full font-semibold transition-colors">
+                            <button
+                                onClick={handleWatch}
+                                disabled={!selectedEpisode}
+                                className="flex items-center gap-2 px-6 py-2 bg-primary hover:bg-red-700 disabled:opacity-40 disabled:hover:bg-primary text-white rounded-full font-semibold transition-colors"
+                            >
                                 <Play className="w-4 h-4" /> Assistir
                             </button>
                             <button className="flex items-center gap-2 px-6 py-2 bg-white/10 hover:bg-white/20 text-white rounded-full transition-colors border border-white/20">
@@ -158,17 +290,44 @@ export default function SeriesDetail() {
             {/* Content Area */}
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-12 grid grid-cols-1 lg:grid-cols-3 gap-8">
                 {/* Main Player */}
-                <div className="lg:col-span-2 space-y-6">
+                <div ref={playerRef} className="lg:col-span-2 space-y-6 scroll-mt-24">
+                    {lastWatched && lastWatched.episodeId !== selectedEpisode?.id && (
+                        <div className="flex flex-wrap items-center gap-3 rounded-lg border border-primary/30 bg-primary/10 px-4 py-3">
+                            <History className="w-4 h-4 text-primary shrink-0" />
+                            <span className="text-sm text-gray-200">
+                                Você parou no <strong>Episódio {lastWatched.episodeNumber}</strong>
+                                {lastWatched.completed
+                                    ? ' (assistido até o fim)'
+                                    : lastWatched.timestampSeconds > 60
+                                        ? `, ${lastWatched.isEstimated ? 'por volta de ' : 'em '}${formatPosition(lastWatched.timestampSeconds)}`
+                                        : ''}
+                            </span>
+                            <button
+                                onClick={() => {
+                                    const ep = episodes.find((e) => e.id === lastWatched.episodeId);
+                                    if (ep) handleEpisodeSelect(ep);
+                                }}
+                                className="ml-auto px-4 py-1.5 rounded-full bg-primary text-black text-xs font-bold hover:brightness-110 transition-all"
+                            >
+                                Continuar
+                            </button>
+                        </div>
+                    )}
+
                     {selectedEpisode ? (
                         <>
                             <h2 className="text-2xl font-bold">Assistir: {selectedEpisode.episode_number}. {selectedEpisode.title || `Episódio ${selectedEpisode.episode_number}`}</h2>
                             <VideoPlayer
-                                embedUrl={
+                                embedUrl={withResume(
                                     useAlternativeLink
                                         ? (selectedEpisode.embed_url_2 || activeSource)
-                                        : activeSource
-                                }
+                                        : activeSource,
+                                    selectedEpisode,
+                                )}
                                 placeholder="Este episódio não tem reprodutor embutido. Utilize os links abaixo para assistir ou baixar."
+                                resumeAt={resumeSecondsFor(selectedEpisode)}
+                                onProgress={(seconds) => recordHistory(selectedEpisode, seconds)}
+                                onEnded={() => recordHistory(selectedEpisode, 0, true)}
                             />
                         </>
                     ) : (
@@ -204,12 +363,12 @@ export default function SeriesDetail() {
                                     setUseAlternativeLink(false);
                                     setActiveSource(transformToEmbed(selectedEpisode.pixeldrain_link, 'pixeldrain'));
                                 }}
-                                className={`flex items-center justify-center gap-2 px-4 py-3 rounded-sm transition-all font-display font-medium tracking-wide w-full ${activeSource.includes('pixeldrain')
+                                className={`flex items-center justify-center gap-2 px-4 py-3 rounded-sm transition-all font-display font-medium tracking-wide w-full ${isPixeldrainUrl(activeSource)
                                     ? 'bg-[#F69220] text-black shadow-[0_0_15px_rgba(246,146,32,0.4)] font-bold'
                                     : 'bg-white/5 border border-white/10 hover:border-[#F69220]/50 hover:bg-[#F69220]/10 text-gray-300 hover:text-[#F69220]'
                                     }`}
                             >
-                                <Play className={`w-4 h-4 ${activeSource.includes('pixeldrain') ? 'fill-black' : 'fill-current'}`} />
+                                <Play className={`w-4 h-4 ${isPixeldrainUrl(activeSource) ? 'fill-black' : 'fill-current'}`} />
                                 PIXELDRAIN
                             </button>
                         )}
@@ -249,7 +408,7 @@ export default function SeriesDetail() {
                             <button
                                 onClick={() => {
                                     setUseAlternativeLink(!useAlternativeLink);
-                                    if (!useAlternativeLink) setActiveSource(selectedEpisode.embed_url_2);
+                                    if (!useAlternativeLink) setActiveSource(selectedEpisode.embed_url_2 || '');
                                     else setActiveSource(selectedEpisode.embed_url_1 || '');
                                 }}
                                 className={`col-span-full mt-2 flex items-center justify-center gap-2 px-3 py-1.5 rounded-lg transition-colors text-sm w-full ${useAlternativeLink
@@ -265,9 +424,30 @@ export default function SeriesDetail() {
 
                 {/* Episode List */}
                 <div className="bg-surface rounded-lg p-6 h-fit sticky top-24">
-                    <h3 className="text-xl font-bold mb-4">Episódios</h3>
+                    <div className="flex items-center justify-between gap-3 mb-4">
+                        <h3 className="text-xl font-bold">Episódios</h3>
+                        {seasons.length > 1 && (
+                            <select
+                                value={activeSeason}
+                                onChange={(e) => setSelectedSeason(Number(e.target.value))}
+                                aria-label="Selecionar temporada"
+                                className="bg-background border border-white/15 rounded-lg px-3 py-1.5 text-sm text-white focus:border-primary focus:outline-none cursor-pointer"
+                            >
+                                {seasons.map((n) => (
+                                    <option key={n} value={n} className="bg-neutral-900">
+                                        {seasonLabel(n)}
+                                    </option>
+                                ))}
+                            </select>
+                        )}
+                    </div>
+                    {seasons.length > 1 && (
+                        <p className="text-xs text-gray-500 mb-3">
+                            {visibleEpisodes.length} episódio{visibleEpisodes.length !== 1 ? 's' : ''} nesta temporada
+                        </p>
+                    )}
                     <div className="space-y-2 max-h-[500px] overflow-y-auto pr-2 custom-scrollbar">
-                        {episodes.map((ep) => (
+                        {visibleEpisodes.map((ep) => (
                             <motion.div
                                 key={ep.id}
                                 whileHover={{ x: 4 }}
@@ -278,8 +458,24 @@ export default function SeriesDetail() {
                                     }`}
                             >
                                 <div>
-                                    <h4 className="font-semibold text-sm">Episódio {ep.episode_number}</h4>
+                                    <h4 className="font-semibold text-sm flex items-center gap-2">
+                                        Episódio {ep.episode_number}
+                                        {progress[ep.id]?.completed && (
+                                            <Check className="w-3.5 h-3.5 text-green-400" aria-label="Assistido" />
+                                        )}
+                                    </h4>
                                     <p className="text-xs text-gray-400">{ep.title || `Episódio ${ep.episode_number}`}</p>
+                                    {!progress[ep.id]?.completed && (progress[ep.id]?.timestampSeconds ?? 0) > 60 && (
+                                        <p
+                                            className="text-[11px] text-primary mt-0.5"
+                                            title={progress[ep.id].isEstimated
+                                                ? 'Posição aproximada, estimada pelo tempo com o episódio aberto'
+                                                : 'Posição exata informada pelo player'}
+                                        >
+                                            Parou em {progress[ep.id].isEstimated ? '~' : ''}
+                                            {formatPosition(progress[ep.id].timestampSeconds)}
+                                        </p>
+                                    )}
                                 </div>
                                 <Play className={`w-4 h-4 ${selectedEpisode?.id === ep.id ? 'text-primary' : 'text-gray-500'}`} />
                             </motion.div>

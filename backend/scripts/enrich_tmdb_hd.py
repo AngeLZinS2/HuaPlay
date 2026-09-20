@@ -54,7 +54,46 @@ def clean_title_for_search(title):
     return t.strip()
 
 
-def fetch_tmdb_media(title):
+ASIAN_ORIGINS = {"CN", "KR", "JP", "TH", "TW", "HK", "PH", "VN", "ID", "SG", "MY", "MO"}
+COUNTRY_CODE = {
+    "China": "CN", "South Korea": "KR", "Japan": "JP", "Thailand": "TH",
+    "Taiwan": "TW", "Hong Kong": "HK", "Philippines": "PH", "Vietnã": "VN",
+    "Vietnam": "VN", "Indonesia": "ID", "Singapore": "SG", "Malaysia": "MY",
+}
+LANG_TO_COUNTRY = {"zh": "CN", "ko": "KR", "ja": "JP", "th": "TH", "cn": "CN",
+                   "vi": "VN", "id": "ID", "tl": "PH", "ms": "MY"}
+
+
+def _origins(item):
+    found = set(item.get("origin_country") or [])
+    lang = (item.get("original_language") or "").lower()
+    if lang in LANG_TO_COUNTRY:
+        found.add(LANG_TO_COUNTRY[lang])
+    return found
+
+
+def pick_result(results, country=None):
+    """Choose an entry that actually comes from Asia.
+
+    The previous version took results[0], so "Heroes" (China) adopted the US
+    series and "What's Left Of You" adopted a Turkish one. Ordering: the series'
+    own country first, then any Asian origin. Returns None rather than falling
+    back to a Western entry — no metadata beats wrong metadata.
+    """
+    if not results:
+        return None
+    want = COUNTRY_CODE.get(country or "", "")
+    if want:
+        for item in results:
+            if want in _origins(item):
+                return item
+    for item in results:
+        if _origins(item) & ASIAN_ORIGINS:
+            return item
+    return None
+
+
+def fetch_tmdb_media(title, country=None):
     search_title = clean_title_for_search(title)
     
     # 1. Search TV
@@ -73,7 +112,11 @@ def fetch_tmdb_media(title):
     if not results:
         return None
 
-    item = results[0]
+    item = pick_result(results, country)
+    if item is None:
+        # Nothing Asian matched this title; leaving the record untouched is
+        # better than stamping it with a Western show that shares the name.
+        return None
     poster_path = item.get("poster_path")
     backdrop_path = item.get("backdrop_path")
     overview = item.get("overview")
@@ -114,7 +157,7 @@ def main():
     conn = sqlite3.connect(DB_PATH)
     cur = conn.cursor()
 
-    series_list = cur.execute("SELECT id, title, cover_image, banner_image, trailer_url FROM series").fetchall()
+    series_list = cur.execute("SELECT id, title, cover_image, banner_image, trailer_url, country FROM series").fetchall()
     total = len(series_list)
 
     print("="*60)
@@ -127,11 +170,11 @@ def main():
     updated_banners = 0
     updated_trailers = 0
 
-    for idx, (sid, title, curr_cover, curr_banner, curr_trailer) in enumerate(series_list, 1):
+    for idx, (sid, title, curr_cover, curr_banner, curr_trailer, country) in enumerate(series_list, 1):
         progress = f"[{idx}/{total}]"
         
         try:
-            media = fetch_tmdb_media(title)
+            media = fetch_tmdb_media(title, country)
         except Exception as e:
             print(f"{progress} ❌ Error fetching {title}: {e}")
             time.sleep(0.5)

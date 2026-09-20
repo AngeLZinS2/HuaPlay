@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import api from '../services/api';
 import { useToast } from '../context/ToastContext';
+import { getOptimizedImageUrl } from '../utils/image';
 import {
     Film,
     PlayCircle,
@@ -37,7 +38,7 @@ const containerVariants = {
 
 const cardVariants = {
     hidden: { opacity: 0, y: 20 },
-    visible: { opacity: 1, y: 0, transition: { duration: 0.4, ease: 'easeOut' } },
+    visible: { opacity: 1, y: 0, transition: { duration: 0.4, ease: 'easeOut' as const } },
 };
 
 function StatCard({
@@ -248,7 +249,7 @@ export default function AdminDashboard() {
                                     className="flex items-center gap-3 p-2.5 rounded-xl hover:bg-white/5 transition-colors group"
                                 >
                                     <div className="w-8 h-11 rounded-lg overflow-hidden bg-gray-800 flex-shrink-0">
-                                        <img src={s.cover_image} alt={s.title} className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" />
+                                        <img src={getOptimizedImageUrl(s.cover_image, 'thumbnail')} alt={s.title} className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" />
                                     </div>
                                     <div className="flex-1 min-w-0">
                                         <p className="text-white text-sm font-medium truncate">{s.title}</p>

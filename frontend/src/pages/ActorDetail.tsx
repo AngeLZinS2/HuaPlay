@@ -3,17 +3,8 @@ import { useParams, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { getActor } from '../services/api'; // We'll add this next
 import { ArrowLeft, Instagram, Twitter, Facebook, Link2 } from 'lucide-react';
-
-interface Actor {
-    id: number;
-    name: string;
-    real_name?: string;
-    gender: string;
-    image_url: string;
-    bio?: string;
-    birth_date?: string;
-    social_media?: string; // Comma separated links
-}
+import type { Actor } from '../types/models';
+import { getOptimizedImageUrl } from '../utils/image';
 
 const ActorDetail = () => {
     const { id } = useParams<{ id: string }>();
@@ -93,7 +84,7 @@ const ActorDetail = () => {
                 <div className="absolute inset-0 overflow-hidden">
                     <div className="absolute inset-0 bg-[#0a0a0a]" />
                     <img
-                        src={actor.image_url}
+                        src={getOptimizedImageUrl(actor.image_url, 'poster')}
                         alt=""
                         className="absolute inset-0 w-full h-full object-cover opacity-30 blur-3xl scale-110"
                     />
@@ -114,7 +105,7 @@ const ActorDetail = () => {
                             className="relative shrink-0 w-full max-w-[300px] aspect-[3/4] rounded-2xl overflow-hidden shadow-2xl border border-white/10 group"
                         >
                             <img
-                                src={actor.image_url}
+                                src={getOptimizedImageUrl(actor.image_url, 'poster')}
                                 alt={actor.name}
                                 className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
                             />

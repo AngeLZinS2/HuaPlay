@@ -2,11 +2,14 @@ import { useEffect, useState } from 'react';
 import Hero from '../components/Hero';
 import { useModal } from '../context/ModalContext';
 import SeriesRow from '../components/SeriesRow';
-import api from '../services/api';
+import api, { getPersonalizedRecommendations } from '../services/api';
+import { fetchMyListSeries } from '../services/library';
+import { getRecentlyWatched } from '../services/userData';
 import { useAuth } from '../context/AuthContext';
 
 export default function Home() {
-    const { currentProfile } = useAuth();
+    const { uid, isAuthenticated, currentProfile, myListIds, myLikeIds } = useAuth();
+    const [myListRow, setMyListRow] = useState<any[]>([]);
     const [recommended, setRecommended] = useState<any[]>([]);
     const [becauseYouWatched, setBecauseYouWatched] = useState<{ base: any; list: any[] } | null>(null);
     const [isPersonalized, setIsPersonalized] = useState(false);
@@ -20,6 +23,7 @@ export default function Home() {
         return (items || []).map((item: any) => ({
             id: item.id,
             title: item.title,
+            cover_image: item.cover_image,
             image: item.cover_image || "https://images.unsplash.com/photo-1536440136628-849c177e76a1?q=80&w=600&auto=format&fit=crop",
             banner_image: item.banner_image,
             banner: item.banner_image,
@@ -38,9 +42,21 @@ export default function Home() {
         const fetchHomeData = async () => {
             setLoading(true);
             try {
-                // 1. Fetch ML Recommendations (headers handled by api interceptor if profile is selected)
-                const recRes = await api.get('/series/recommendations');
-                const recData = recRes.data;
+                // 1. Recommendations. The taste signals live in Firestore now, so
+                // they are gathered here and posted to the stateless recommender.
+                let recData;
+                if (uid && currentProfile) {
+                    const history = await getRecentlyWatched(uid, currentProfile.id, 40);
+                    const watchedIds = [...new Set(history.map((h) => h.seriesId))];
+                    recData = await getPersonalizedRecommendations({
+                        watched_ids: watchedIds,
+                        liked_ids: myLikeIds,
+                        listed_ids: myListIds,
+                        recent_series_id: watchedIds[0] ?? null,
+                    });
+                } else {
+                    recData = (await api.get('/series/recommendations')).data;
+                }
 
                 setIsPersonalized(recData.is_personalized || false);
                 setRecommended(formatSeries(recData.recommendations || []));
@@ -79,7 +95,26 @@ export default function Home() {
         };
 
         fetchHomeData();
-    }, [currentProfile?.id]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [uid, currentProfile?.id, myLikeIds, myListIds]);
+
+    useEffect(() => {
+        const fetchMyList = async () => {
+            if (!isAuthenticated || !currentProfile || !uid) {
+                setMyListRow([]);
+                return;
+            }
+            try {
+                const listData = await fetchMyListSeries(uid, currentProfile.id);
+                setMyListRow(formatSeries(listData || []));
+            } catch (err) {
+                console.error("Failed to fetch My List for homepage:", err);
+                setMyListRow([]);
+            }
+        };
+
+        fetchMyList();
+    }, [isAuthenticated, currentProfile?.id, myListIds]);
 
     const handleOpenModal = (seriesItem: any) => {
         openModal(seriesItem);
@@ -98,6 +133,15 @@ export default function Home() {
             <Hero />
 
             <div className="relative z-10 -mt-12 space-y-12">
+                {/* 0. Minha Lista (Exibido apenas se o usuário estiver logado e possuir conteúdos salvos) */}
+                {isAuthenticated && myListRow.length > 0 && (
+                    <SeriesRow
+                        title="Minha Lista"
+                        series={myListRow}
+                        onOpenModal={handleOpenModal}
+                    />
+                )}
+
                 {/* 1. Main Recommendation Row (ML Personalized or Dynamic Cold Start) */}
                 {recommended.length > 0 && (
                     <SeriesRow

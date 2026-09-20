@@ -1,9 +1,9 @@
 import { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, Edit2, X } from 'lucide-react';
+import { Plus, Edit2, X, LogOut } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
-import api, { updateProfile } from '../services/api';
+import { createProfile, deleteProfile, updateProfile } from '../services/userData';
 
 // --- Particle Component with Gold Theme ---
 const ParticlesBackground = () => {
@@ -59,7 +59,7 @@ const ParticlesBackground = () => {
 };
 
 export default function Profiles() {
-    const { profiles, selectProfile, fetchProfiles } = useAuth();
+    const { uid, profiles, selectProfile, fetchProfiles, logout } = useAuth();
     const [isManaging, setIsManaging] = useState(false);
     const [isCreating, setIsCreating] = useState(false);
     const [newProfileName, setNewProfileName] = useState('');
@@ -73,7 +73,7 @@ export default function Profiles() {
         if (isManaging) {
             setEditingProfile(profile);
             setEditProfileName(profile.name);
-            setEditAvatarUrl(profile.avatar_url || '');
+            setEditAvatarUrl(profile.avatarUrl || '');
             return;
         }
         selectProfile(profile);
@@ -85,9 +85,10 @@ export default function Profiles() {
         if (!editingProfile) return;
 
         try {
-            await updateProfile(editingProfile.id, {
+            if (!uid) return;
+            await updateProfile(uid, editingProfile.id, {
                 name: editProfileName,
-                avatar_url: editAvatarUrl
+                avatarUrl: editAvatarUrl,
             });
             setEditingProfile(null);
             await fetchProfiles();
@@ -99,10 +100,8 @@ export default function Profiles() {
     const handleCreateProfile = async (e: React.FormEvent) => {
         e.preventDefault();
         try {
-            await api.post('/users/profiles', {
-                name: newProfileName,
-                avatar_url: `https://wallpapers.com/images/hd/netflix-profile-pictures-1000-x-1000-qo9h82134t9nv0j0.jpg`
-            });
+            if (!uid) return;
+            await createProfile(uid, { name: newProfileName });
             setNewProfileName('');
             setIsCreating(false);
             await fetchProfiles();
@@ -111,14 +110,15 @@ export default function Profiles() {
         }
     };
 
-    const handleDeleteProfile = async (id: number) => {
+    const handleDeleteProfile = async (id: string) => {
         if (!window.confirm("Tem certeza que deseja excluir este perfil?")) return;
         try {
-            await api.delete(`/users/profiles/${id}`);
+            if (!uid) return;
+            await deleteProfile(uid, id);
             await fetchProfiles();
             setEditingProfile(null);
         } catch (error) {
-            alert("Não é possível excluir o último perfil.");
+            console.error("Failed to delete profile", error);
         }
     };
 
@@ -128,6 +128,18 @@ export default function Profiles() {
 
             {/* Top decorative line */}
             <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-[#AD892D] to-transparent opacity-60" />
+
+            {/* Logout button — always visible as escape route */}
+            <motion.button
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 0.5 }}
+                onClick={() => { logout(); navigate('/login'); }}
+                className="absolute top-4 right-4 z-20 flex items-center gap-2 px-4 py-2 rounded-xl text-sm text-[#B8860B] border border-[#B8860B]/30 hover:border-[#FFD700]/60 hover:text-[#FFD700] hover:bg-[#FFD700]/5 transition-all duration-300"
+            >
+                <LogOut className="w-4 h-4" />
+                Sair
+            </motion.button>
 
             <div className="relative z-10 w-full max-w-6xl flex flex-col items-center">
                 <motion.h1
@@ -167,7 +179,7 @@ export default function Profiles() {
                                 {/* Inner Card Border */}
                                 <div className="relative w-36 h-36 md:w-52 md:h-52 bg-black rounded-[9px] overflow-hidden border border-[#D4AF37]/30">
                                     <img
-                                        src={profile.avatar_url}
+                                        src={profile.avatarUrl ?? undefined}
                                         alt={profile.name}
                                         className={`w-full h-full object-cover transition-transform duration-700 ${isManaging ? 'scale-100 blur-[2px]' : 'group-hover:scale-110'}`}
                                     />

@@ -15,3 +15,24 @@ venv/
 
 # Logs
 *.log
+
+# IDE
+.idea/
+
+# Database backups
+*.db.bak-*
+*.bak-*
+
+# Android / Capacitor build artifacts
+frontend/android/.gradle/
+frontend/android/build/
+frontend/android/app/build/
+frontend/android/app/src/main/assets/public/
+frontend/android/capacitor-cordova-android-plugins/build/
+frontend/android/local.properties
+
+# APK builds
+*.apk
+
+# PWA dev build
+frontend/dev-dist/

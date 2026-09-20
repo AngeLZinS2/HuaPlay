@@ -19,6 +19,7 @@ import MyList from './pages/MyList';
 import Profiles from './pages/Profiles';
 import PageTransition from './components/PageTransition';
 import AdminLayout from './components/admin/AdminLayout';
+import RequireAdmin from './components/admin/RequireAdmin';
 
 import CategoryExplore from './pages/CategoryExplore';
 
@@ -53,15 +54,17 @@ function App() {
   // ─── Admin Layout (isolated) ───────────────────────────────────────────────
   if (isAdminRoute) {
     return (
-      <AdminLayout>
-        <AnimatePresence mode="wait">
-          <Routes location={location} key={location.pathname}>
-            <Route path="/admin" element={<AdminDashboard />} />
-            <Route path="/admin/series" element={<AdminSeries />} />
-            <Route path="/admin/actors" element={<AdminActors />} />
-          </Routes>
-        </AnimatePresence>
-      </AdminLayout>
+      <RequireAdmin>
+        <AdminLayout>
+          <AnimatePresence mode="wait">
+            <Routes location={location} key={location.pathname}>
+              <Route path="/admin" element={<AdminDashboard />} />
+              <Route path="/admin/series" element={<AdminSeries />} />
+              <Route path="/admin/actors" element={<AdminActors />} />
+            </Routes>
+          </AnimatePresence>
+        </AdminLayout>
+      </RequireAdmin>
     );
   }
 

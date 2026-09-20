@@ -4,9 +4,11 @@ import { Play, Plus, Check, ThumbsUp, X, Volume2, VolumeX } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import { addToMyList, removeFromMyList, likeSeries, unlikeSeries } from '../services/userData';
 import { useToast } from '../context/ToastContext';
 import { useModal } from '../context/ModalContext';
-import { getYouTubeEmbedUrl, getYouTubeVideoId } from '../utils/youtube';
+import { getTrailerEmbed } from '../utils/trailer';
+import { getOptimizedImageUrl } from '../utils/image';
 
 export default function SeriesDetailsModal() {
     const { isOpen, content: selectedSeries, closeModal } = useModal();
@@ -14,12 +16,15 @@ export default function SeriesDetailsModal() {
     const [isMuted, setIsMuted] = useState(true);
     const iframeRef = useRef<HTMLIFrameElement>(null);
     const navigate = useNavigate();
-    const { myListIds, myLikeIds, updateLists, isAuthenticated } = useAuth();
+    const { uid, currentProfile, myListIds, myLikeIds, updateLists, isAuthenticated } = useAuth();
     const { addToast } = useToast();
 
     // Derived states
     const isInList = selectedSeries ? myListIds.includes(selectedSeries.id) : false;
     const isLiked = selectedSeries ? myLikeIds.includes(selectedSeries.id) : false;
+    // null whenever the link is missing or is not something we can embed, in
+    // which case the header falls back to the banner still.
+    const trailer = getTrailerEmbed(selectedSeries?.trailer_url);
 
     // Reset state when modal opens/closes or series changes
     useEffect(() => {
@@ -61,10 +66,10 @@ export default function SeriesDetailsModal() {
         }
         try {
             if (isInList) {
-                await api.delete(`/users/me/list/${selectedSeries.id}`);
+                await removeFromMyList(uid!, currentProfile!.id, selectedSeries.id);
                 addToast('Removido da sua lista', 'info');
             } else {
-                await api.post(`/users/me/list/${selectedSeries.id}`);
+                await addToMyList(uid!, currentProfile!.id, selectedSeries.id);
                 addToast('Adicionado à sua lista', 'success');
             }
             await updateLists();
@@ -83,10 +88,10 @@ export default function SeriesDetailsModal() {
         }
         try {
             if (isLiked) {
-                await api.delete(`/users/me/likes/${selectedSeries.id}`);
+                await unlikeSeries(uid!, currentProfile!.id, selectedSeries.id);
                 addToast('Você descurtiu', 'info');
             } else {
-                await api.post(`/users/me/likes/${selectedSeries.id}`);
+                await likeSeries(uid!, currentProfile!.id, selectedSeries.id);
                 addToast('Você curtiu!', 'success');
             }
             await updateLists();
@@ -129,10 +134,11 @@ export default function SeriesDetailsModal() {
 
                         {/* Header Image Area */}
                         <div className="relative aspect-video w-full">
-                            {selectedSeries.trailer_url && getYouTubeEmbedUrl(selectedSeries.trailer_url) ? (
+                            {trailer ? (
                                 <iframe
                                     ref={iframeRef}
-                                    src={`${getYouTubeEmbedUrl(selectedSeries.trailer_url)}?enablejsapi=1&origin=${encodeURIComponent(window.location.origin)}&autoplay=1&mute=1&controls=0&modestbranding=1&loop=1&playlist=${getYouTubeVideoId(selectedSeries.trailer_url)}`}
+                                    src={trailer.src}
+                                    title={selectedSeries.title}
                                     className="w-full h-full object-cover pointer-events-none"
                                     frameBorder="0"
                                     allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
@@ -140,7 +146,7 @@ export default function SeriesDetailsModal() {
                                 />
                             ) : (
                                 <img
-                                    src={selectedSeries.banner || selectedSeries.banner_image || selectedSeries.image || selectedSeries.cover_image}
+                                    src={getOptimizedImageUrl(selectedSeries.banner || selectedSeries.banner_image || selectedSeries.image || selectedSeries.cover_image, 'backdrop')}
                                     alt={selectedSeries.title}
                                     className="w-full h-full object-cover"
                                 />
@@ -173,7 +179,7 @@ export default function SeriesDetailsModal() {
                                 >
                                     <ThumbsUp className={`w-5 h-5 md:w-6 md:h-6 ${isLiked ? 'fill-current' : ''}`} />
                                 </button>
-                                {selectedSeries.trailer_url && (
+                                {trailer?.supportsMuteApi && (
                                     <button
                                         onClick={() => setIsMuted(!isMuted)}
                                         className="ml-auto p-2 md:p-3 border border-white/20 rounded-full text-gray-300 hover:text-white bg-black/40 backdrop-blur-sm"

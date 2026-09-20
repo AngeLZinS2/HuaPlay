@@ -1,9 +1,15 @@
 import math
 import random
+import time
 from collections import Counter
 from typing import Optional, Dict, Any, List
 from sqlalchemy.orm import Session
 import models
+
+# Inverse document frequency cache. Rebuilt when the catalog size changes or the
+# TTL lapses — genres and cast change rarely, and rebuilding costs a full pass.
+_IDF_CACHE: Dict[str, Any] = {"idf": None, "count": -1, "built_at": 0.0}
+_IDF_TTL_SECONDS = 600
 
 def build_feature_vector(series: models.Series) -> Counter:
     """Extract tokenized TF-IDF feature weights for a series (genres, country, cast, type)."""
@@ -34,6 +40,48 @@ def build_feature_vector(series: models.Series) -> Counter:
     return tokens
 
 
+def compute_idf(all_series: List[models.Series]) -> Dict[str, float]:
+    """Inverse document frequency for every term in the catalog.
+
+    Without this, "genre:drama" — which nearly every title carries — weighs the
+    same as "genre:wuxia", so hundreds of series tie on identical scores. Rare
+    terms are what actually discriminate, and log(N / df) is what expresses that.
+    """
+    total = len(all_series)
+    if not total:
+        return {}
+
+    doc_freq: Counter = Counter()
+    for series in all_series:
+        for term in build_feature_vector(series):
+            doc_freq[term] += 1
+
+    # 1 + log(...) keeps a term that appears in every document at a small positive
+    # weight instead of exactly zero, so it still breaks ties between equals.
+    return {term: 1.0 + math.log(total / df) for term, df in doc_freq.items()}
+
+
+def get_idf(db: Session, all_series: List[models.Series]) -> Dict[str, float]:
+    """Cached compute_idf, keyed on catalog size with a TTL fallback."""
+    now = time.time()
+    fresh = (
+        _IDF_CACHE["idf"] is not None
+        and _IDF_CACHE["count"] == len(all_series)
+        and (now - _IDF_CACHE["built_at"]) < _IDF_TTL_SECONDS
+    )
+    if not fresh:
+        _IDF_CACHE["idf"] = compute_idf(all_series)
+        _IDF_CACHE["count"] = len(all_series)
+        _IDF_CACHE["built_at"] = now
+    return _IDF_CACHE["idf"]
+
+
+def weighted_vector(series: models.Series, idf: Dict[str, float]) -> Counter:
+    """Feature vector scaled by inverse document frequency."""
+    vec = build_feature_vector(series)
+    return Counter({term: weight * idf.get(term, 1.0) for term, weight in vec.items()})
+
+
 def cosine_similarity(v1: Counter, v2: Counter) -> float:
     """Calculate cosine similarity score between two feature vectors."""
     dot_product = sum(weight * v2.get(term, 0.0) for term, weight in v1.items())
@@ -44,54 +92,47 @@ def cosine_similarity(v1: Counter, v2: Counter) -> float:
     return dot_product / (mag1 * mag2)
 
 
-def get_ml_recommendations(db: Session, user_id: Optional[int] = None, profile_id: Optional[int] = None, limit: int = 15) -> Dict[str, Any]:
-    """
-    Computes personalized Machine Learning recommendations based on user watch history, likes, and saved list.
-    Returns:
-    - recommendations: List[Series]
-    - because_you_watched: Dict containing { 'base_series': Series, 'recommendations': List[Series] } or None
+def get_ml_recommendations(
+    db: Session,
+    watched_ids: Optional[List[int]] = None,
+    liked_ids: Optional[List[int]] = None,
+    listed_ids: Optional[List[int]] = None,
+    recent_series_id: Optional[int] = None,
+    limit: int = 15,
+) -> Dict[str, Any]:
+    """Content-based recommendations from a profile's interaction signals.
+
+    The signals arrive from the caller rather than being read from the database:
+    likes, my-list and watch history live in Firestore now, owned by the client,
+    while the catalog stays here. That keeps this function stateless about users
+    and avoids giving the backend Firestore credentials just to read them.
     """
     all_series = db.query(models.Series).all()
     if not all_series:
         return {"recommendations": [], "because_you_watched": None, "is_personalized": False}
 
-    # Gather user interaction history
+    idf = get_idf(db, all_series)
+
+    by_id = {s.id: s for s in all_series}
     user_history_ids = set()
     user_profile_vector = Counter()
-    recent_watched_series = None
+    recent_watched_series = by_id.get(recent_series_id) if recent_series_id else None
 
-    if profile_id:
-        # 1. Watch history
-        history_rows = db.query(models.WatchHistory).filter(models.WatchHistory.profile_id == profile_id).order_by(models.WatchHistory.updated_at.desc()).all()
-        for row in history_rows:
-            user_history_ids.add(row.series_id)
-            series_item = db.query(models.Series).filter(models.Series.id == row.series_id).first()
-            if series_item:
-                if not recent_watched_series:
-                    recent_watched_series = series_item
-                vec = build_feature_vector(series_item)
-                for term, weight in vec.items():
-                    user_profile_vector[term] += weight * 3.0
-
-        # 2. Likes
-        like_rows = db.query(models.Like).filter(models.Like.profile_id == profile_id).all()
-        for row in like_rows:
-            user_history_ids.add(row.series_id)
-            series_item = db.query(models.Series).filter(models.Series.id == row.series_id).first()
-            if series_item:
-                vec = build_feature_vector(series_item)
-                for term, weight in vec.items():
-                    user_profile_vector[term] += weight * 2.5
-
-        # 3. User List (Saved)
-        list_rows = db.query(models.UserList).filter(models.UserList.profile_id == profile_id).all()
-        for row in list_rows:
-            user_history_ids.add(row.series_id)
-            series_item = db.query(models.Series).filter(models.Series.id == row.series_id).first()
-            if series_item:
-                vec = build_feature_vector(series_item)
-                for term, weight in vec.items():
-                    user_profile_vector[term] += weight * 2.0
+    # Weights mirror how strong each signal is as evidence of taste.
+    for ids, weight in (
+        (watched_ids or [], 3.0),
+        (liked_ids or [], 2.5),
+        (listed_ids or [], 2.0),
+    ):
+        for series_id in ids:
+            series_item = by_id.get(series_id)
+            if not series_item:
+                continue
+            user_history_ids.add(series_item.id)
+            if recent_watched_series is None and weight == 3.0:
+                recent_watched_series = series_item
+            for term, value in weighted_vector(series_item, idf).items():
+                user_profile_vector[term] += value * weight
 
     # If user profile vector is empty (Cold Start), generate a randomized diverse high-quality selection
     if not user_profile_vector:
@@ -112,27 +153,30 @@ def get_ml_recommendations(db: Session, user_id: Optional[int] = None, profile_i
     for s in all_series:
         if s.id in user_history_ids:
             continue
-        vec = build_feature_vector(s)
+        vec = weighted_vector(s, idf)
         score = cosine_similarity(user_profile_vector, vec)
         if s.banner_image:
             score += 0.05
         scored_series.append((score, s))
 
-    scored_series.sort(key=lambda x: x[0], reverse=True)
+    # Ties are common for series carrying a single common genre, where IDF cannot
+    # separate candidates that share exactly the same terms. Fall back to
+    # popularity rather than insertion order, which was effectively sorting by id.
+    scored_series.sort(key=lambda x: (x[0], x[1].views_count or 0), reverse=True)
     top_recommendations = [item[1] for item in scored_series[:limit]]
 
     # Compute "Because You Watched X" section
     because_you_watched = None
     if recent_watched_series:
-        recent_vec = build_feature_vector(recent_watched_series)
+        recent_vec = weighted_vector(recent_watched_series, idf)
         byw_scored = []
         for s in all_series:
             if s.id == recent_watched_series.id or s.id in user_history_ids:
                 continue
-            s_vec = build_feature_vector(s)
+            s_vec = weighted_vector(s, idf)
             sim = cosine_similarity(recent_vec, s_vec)
             byw_scored.append((sim, s))
-        byw_scored.sort(key=lambda x: x[0], reverse=True)
+        byw_scored.sort(key=lambda x: (x[0], x[1].views_count or 0), reverse=True)
         byw_list = [item[1] for item in byw_scored[:12]]
         if byw_list:
             because_you_watched = {

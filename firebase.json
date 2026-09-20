@@ -1,0 +1,20 @@
+{
+  "auth": {
+    "authorizedDomains": [
+      "localhost",
+      "gtavi-6991d.firebaseapp.com",
+      "gtavi-6991d.web.app"
+    ],
+    "providers": {
+      "emailPassword": true,
+      "googleSignIn": {
+        "oAuthBrandDisplayName": "HuaPlay",
+        "supportEmail": "angelo.neri2020@gmail.com"
+      }
+    }
+  },
+  "firestore": {
+    "rules": "firestore.rules",
+    "indexes": "firestore.indexes.json"
+  }
+}

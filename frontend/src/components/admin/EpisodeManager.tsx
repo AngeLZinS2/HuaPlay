@@ -1,5 +1,6 @@
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Plus, Edit, Trash2, List, PlayCircle, Download } from 'lucide-react';
+import { getOptimizedImageUrl } from '../../utils/image';
 
 interface EpisodeManagerProps {
     isOpen: boolean;
@@ -54,7 +55,7 @@ export default function EpisodeManager({
                         <div className="flex items-center justify-between px-5 py-4 border-b border-white/5 flex-shrink-0">
                             <div className="flex items-center gap-3 min-w-0">
                                 <div className="w-8 h-11 rounded-lg overflow-hidden bg-gray-900 flex-shrink-0">
-                                    <img src={managingSeries.cover_image} alt="" className="w-full h-full object-cover" />
+                                    <img src={getOptimizedImageUrl(managingSeries.cover_image, 'thumbnail')} alt="" className="w-full h-full object-cover" />
                                 </div>
                                 <div className="min-w-0">
                                     <h2 className="text-sm font-bold text-white truncate">{managingSeries.title}</h2>

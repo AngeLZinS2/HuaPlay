@@ -1,5 +1,6 @@
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Save, Image, Film, Globe, Link, Star, FileText, Users } from 'lucide-react';
+import { X, Save, Image, Film, Link, Star, FileText, CheckCircle2, AlertTriangle } from 'lucide-react';
+import { getTrailerEmbed, getTrailerProviderLabel } from '../../utils/trailer';
 
 interface SeriesModalProps {
     isOpen: boolean;
@@ -40,6 +41,11 @@ export default function SeriesModal({
     if (!isOpen) return null;
 
     const update = (field: string, value: any) => setFormData({ ...formData, [field]: value });
+
+    // The hero silently fell back to the still banner when a pasted link could
+    // not be embedded, which read as "the trailer just does not work". Resolve
+    // it here so the admin sees straight away whether the link was understood.
+    const trailerPreview = getTrailerEmbed(formData.trailer_url);
 
     return (
         <AnimatePresence>
@@ -255,8 +261,25 @@ export default function SeriesModal({
                                     value={formData.trailer_url || ''}
                                     onChange={(e) => update('trailer_url', extractSrc(e.target.value))}
                                     className={inputClass}
-                                    placeholder="YouTube, Ok.ru ou embed URL"
+                                    placeholder="YouTube, Ok.ru, Dailymotion, Vimeo ou URL de embed"
                                 />
+                                {formData.trailer_url?.trim() && (
+                                    trailerPreview ? (
+                                        <p className="mt-1.5 flex items-center gap-1.5 text-xs text-emerald-400">
+                                            <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+                                            Link reconhecido: {getTrailerProviderLabel(trailerPreview.provider)}
+                                        </p>
+                                    ) : (
+                                        <p className="mt-1.5 flex items-start gap-1.5 text-xs text-amber-400">
+                                            <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                                            <span>
+                                                Link não reconhecido como vídeo — o destaque vai exibir o banner.
+                                                Cole a URL do player (o <code>src</code> do iframe) ou o código
+                                                &lt;iframe&gt; inteiro.
+                                            </span>
+                                        </p>
+                                    )
+                                )}
                             </div>
                         </Section>
 

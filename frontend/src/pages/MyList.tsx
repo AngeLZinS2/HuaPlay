@@ -2,27 +2,31 @@
 import { useEffect, useState } from 'react';
 import Navbar from '../components/Navbar';
 import SeriesCard from '../components/SeriesCard';
-import { getMyList, getMyLikes } from '../services/api';
+import { fetchLikedSeries, fetchMyListSeries } from '../services/library';
 import { useAuth } from '../context/AuthContext';
 import { motion } from 'framer-motion';
 
 export default function MyList() {
-    const { isAuthenticated } = useAuth();
+    const { uid, currentProfile, isAuthenticated } = useAuth();
     const [myList, setMyList] = useState<any[]>([]);
     const [myLikes, setMyLikes] = useState<any[]>([]);
     const [activeTab, setActiveTab] = useState<'mylist' | 'likes'>('mylist');
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        if (isAuthenticated) {
+        if (isAuthenticated && uid && currentProfile) {
             fetchLists();
         }
-    }, [isAuthenticated]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [isAuthenticated, uid, currentProfile?.id]);
 
     const fetchLists = async () => {
         setLoading(true);
         try {
-            const [listData, likesData] = await Promise.all([getMyList(), getMyLikes()]);
+            const [listData, likesData] = await Promise.all([
+                fetchMyListSeries(uid!, currentProfile!.id),
+                fetchLikedSeries(uid!, currentProfile!.id),
+            ]);
             setMyList(listData);
             setMyLikes(likesData);
         } catch (error) {

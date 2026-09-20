@@ -1,14 +1,22 @@
 import { useState, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
-import api from '../services/api';
+import api, {
+    createEpisode,
+    deleteEpisode,
+    deleteSeries,
+    getEpisodes,
+    getSeriesPage,
+    updateEpisode,
+} from '../services/api';
 import { useToast } from '../context/ToastContext';
-import { Plus, Search, Filter, X } from 'lucide-react';
+import { Plus, Search, Filter, X, Sparkles } from 'lucide-react';
 
 import SeriesTable from '../components/admin/SeriesTable';
 import SeriesModal from '../components/admin/SeriesModal';
 import EpisodeModal from '../components/admin/EpisodeModal';
 import EpisodeManager from '../components/admin/EpisodeManager';
 import DeleteConfirmModal from '../components/admin/DeleteConfirmModal';
+import FeaturedConfigModal from '../components/admin/FeaturedConfigModal';
 
 const ITEMS_PER_PAGE = 10;
 
@@ -37,6 +45,7 @@ const DEFAULT_EPISODE_FORM = {
     series_id: '',
     title: '',
     episode_number: 1,
+    season_number: 1,
     embed_url_1: '',
     embed_url_2: '',
     youtube_link: '',
@@ -60,6 +69,7 @@ export default function AdminSeries() {
     const [isSeriesModalOpen, setIsSeriesModalOpen] = useState(false);
     const [isEpisodeModalOpen, setIsEpisodeModalOpen] = useState(false);
     const [isEpisodeManagerOpen, setIsEpisodeManagerOpen] = useState(false);
+    const [isFeaturedConfigOpen, setIsFeaturedConfigOpen] = useState(false);
     const [deleteTarget, setDeleteTarget] = useState<{ type: 'series' | 'episode'; id: number; name: string } | null>(null);
     const [saving, setSaving] = useState(false);
 
@@ -105,9 +115,8 @@ export default function AdminSeries() {
                 status: filterStatus !== 'All' ? filterStatus : undefined,
                 release_year: filterYear !== 'All' ? parseInt(filterYear) : undefined,
             };
-            const res = await api.get('/series/', { params });
-            setSeriesList(Array.isArray(res.data) ? res.data : []);
-            const total = parseInt(res.headers['x-total-count'] || '0');
+            const { items, total } = await getSeriesPage(params);
+            setSeriesList(items);
             setTotalItems(total);
             setTotalPages(Math.max(1, Math.ceil(total / ITEMS_PER_PAGE)));
         } catch {
@@ -151,6 +160,19 @@ export default function AdminSeries() {
         setIsSeriesModalOpen(true);
     };
 
+    // A bare `catch {}` hid why a save failed — a 403 from an expired admin
+    // session and a 422 from a rejected field both surfaced as the same
+    // "Erro ao salvar". Surface the status and the backend's own detail.
+    const describeError = (error: any) => {
+        const status = error?.response?.status;
+        const detail = error?.response?.data?.detail;
+        if (!status) return error?.message || 'sem resposta do servidor';
+        const text = Array.isArray(detail)
+            ? detail.map((d: any) => `${d.loc?.slice(-1)[0]}: ${d.msg}`).join('; ')
+            : detail;
+        return `${status}${text ? ` — ${text}` : ''}`;
+    };
+
     const handleSaveSeries = async (e: React.FormEvent) => {
         e.preventDefault();
         setSaving(true);
@@ -164,8 +186,9 @@ export default function AdminSeries() {
             }
             setIsSeriesModalOpen(false);
             fetchSeries();
-        } catch {
-            addToast('Erro ao salvar série.', 'error');
+        } catch (error) {
+            console.error('Failed to save series', error);
+            addToast(`Erro ao salvar série: ${describeError(error)}`, 'error');
         } finally {
             setSaving(false);
         }
@@ -174,7 +197,7 @@ export default function AdminSeries() {
     const handleDeleteSeries = async () => {
         if (!deleteTarget) return;
         try {
-            await api.delete(`/series/${deleteTarget.id}`);
+            await deleteSeries(deleteTarget.id);
             addToast('Série excluída!', 'success');
             fetchSeries();
         } catch {
@@ -196,8 +219,7 @@ export default function AdminSeries() {
     const handleManageEpisodes = async (series: any) => {
         setManagingSeries(series);
         try {
-            const res = await api.get(`/series/${series.id}/episodes`);
-            setEpisodeList(res.data);
+            setEpisodeList(await getEpisodes(series.id));
             setIsEpisodeManagerOpen(true);
         } catch {
             addToast('Erro ao carregar episódios.', 'error');
@@ -206,8 +228,7 @@ export default function AdminSeries() {
 
     const refreshEpisodes = async () => {
         if (!managingSeries) return;
-        const res = await api.get(`/series/${managingSeries.id}/episodes`);
-        setEpisodeList(res.data);
+        setEpisodeList(await getEpisodes(managingSeries.id));
     };
 
     const handleAddEpisode = () => {
@@ -216,6 +237,7 @@ export default function AdminSeries() {
             ...DEFAULT_EPISODE_FORM,
             series_id: managingSeries?.id?.toString() || '',
             episode_number: episodeList.length + 1,
+            season_number: 1,
         });
         setIsEpisodeManagerOpen(false);
         setIsEpisodeModalOpen(true);
@@ -227,6 +249,7 @@ export default function AdminSeries() {
             series_id: ep.series_id?.toString() || '',
             title: ep.title || '',
             episode_number: ep.episode_number || 1,
+            season_number: ep.season_number ?? 1,
             embed_url_1: ep.embed_url_1 || '',
             embed_url_2: ep.embed_url_2 || '',
             youtube_link: ep.youtube_link || '',
@@ -249,19 +272,21 @@ export default function AdminSeries() {
                 ...episodeData,
                 series_id: parseInt(episodeData.series_id),
                 episode_number: parseInt(episodeData.episode_number.toString()),
+                season_number: parseInt((episodeData.season_number ?? 1).toString()),
             };
             if (editingEpisodeId) {
-                await api.put(`/episodes/${editingEpisodeId}`, payload);
+                await updateEpisode(editingEpisodeId, payload);
                 addToast('Episódio atualizado!', 'success');
             } else {
-                await api.post(`/series/${episodeData.series_id}/episodes`, payload);
+                await createEpisode(payload.series_id, payload);
                 addToast('Episódio adicionado!', 'success');
             }
             setIsEpisodeModalOpen(false);
             await refreshEpisodes();
             setIsEpisodeManagerOpen(true);
-        } catch {
-            addToast('Erro ao salvar episódio.', 'error');
+        } catch (error) {
+            console.error('Failed to save episode', error);
+            addToast(`Erro ao salvar episódio: ${describeError(error)}`, 'error');
         } finally {
             setSaving(false);
         }
@@ -275,7 +300,7 @@ export default function AdminSeries() {
     const confirmDeleteEpisode = async () => {
         if (!deleteTarget) return;
         try {
-            await api.delete(`/episodes/${deleteTarget.id}`);
+            await deleteEpisode(deleteTarget.id);
             addToast('Episódio excluído!', 'success');
             await refreshEpisodes();
         } catch {
@@ -283,9 +308,12 @@ export default function AdminSeries() {
         }
     };
 
+    // Admins paste either a bare URL or the whole <iframe> snippet the host
+    // offers. Entity-decode the extracted src: a copied snippet carries &amp;
+    // between query params, which would otherwise be stored verbatim.
     const extractSrc = (input: string) => {
         const match = input.match(/src=["']([^"']+)["']/);
-        return match ? match[1] : input;
+        return (match ? match[1] : input).replace(/&amp;/g, '&').trim();
     };
 
     const activeFilters = (filterType !== 'All' ? 1 : 0) + (filterStatus !== 'All' ? 1 : 0) + (filterYear !== 'All' ? 1 : 0);
@@ -302,13 +330,22 @@ export default function AdminSeries() {
                         {totalItems > 0 ? `${totalItems} projeto${totalItems !== 1 ? 's' : ''} cadastrado${totalItems !== 1 ? 's' : ''}` : 'Gerencie o catálogo de conteúdo'}
                     </p>
                 </div>
-                <button
-                    onClick={handleOpenNewSeries}
-                    className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-yellow-500 hover:bg-yellow-400 text-black text-sm font-bold transition-all shadow-lg shadow-yellow-500/20"
-                >
-                    <Plus className="w-4 h-4" />
-                    Nova Série
-                </button>
+                <div className="flex items-center gap-3">
+                    <button
+                        onClick={() => setIsFeaturedConfigOpen(true)}
+                        className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-yellow-500/30 text-yellow-400 text-sm font-semibold transition-all shadow-lg hover:border-yellow-500/60"
+                    >
+                        <Sparkles className="w-4 h-4 text-yellow-400" />
+                        Configurar Destaque
+                    </button>
+                    <button
+                        onClick={handleOpenNewSeries}
+                        className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-yellow-500 hover:bg-yellow-400 text-black text-sm font-bold transition-all shadow-lg shadow-yellow-500/20"
+                    >
+                        <Plus className="w-4 h-4" />
+                        Nova Série
+                    </button>
+                </div>
             </div>
 
             {/* Search & Filters */}
@@ -474,6 +511,11 @@ export default function AdminSeries() {
                         ? 'Isso excluirá permanentemente a série e todos os seus episódios.'
                         : 'Esta ação removerá permanentemente o episódio.'
                 }
+            />
+
+            <FeaturedConfigModal
+                isOpen={isFeaturedConfigOpen}
+                onClose={() => setIsFeaturedConfigOpen(false)}
             />
         </div>
     );

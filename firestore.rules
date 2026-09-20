@@ -1,0 +1,186 @@
+rules_version = '2';
+
+// ===============================================================
+// HuaPlay — Assumed Data Model
+// ===============================================================
+//
+// Only per-user data lives in Firestore. The catalog (series, episodes,
+// actors) stays in the FastAPI/SQLite backend, so nothing here is public.
+//
+// Collection: users
+// Document ID: the Firebase Auth uid
+// Fields:
+//   - email:       string  (required, valid email, immutable after create)
+//   - displayName: string  (required, 1..80)
+//   - createdAt:   timestamp (required, immutable)
+//   - updatedAt:   timestamp (required, recent)
+//
+// Collection: users/{uid}/profiles
+// Document ID: auto-generated
+// Fields:
+//   - name:      string    (required, 1..40)
+//   - avatarUrl: string    (optional, http(s) URL)
+//   - createdAt: timestamp (required, immutable)
+//
+// Collection: users/{uid}/profiles/{profileId}/likes
+// Collection: users/{uid}/profiles/{profileId}/myList
+// Document ID: the catalog series id, as a string
+// Fields:
+//   - seriesId:  number    (required, > 0)
+//   - createdAt: timestamp (required)
+//
+// Collection: users/{uid}/profiles/{profileId}/watchHistory
+// Document ID: the catalog episode id, as a string
+// Fields:
+//   - episodeId:        number    (required, > 0)
+//   - seriesId:         number    (required, > 0)
+//   - episodeNumber:    number    (required, >= 0)
+//   - timestampSeconds: number    (required, 0..86400)
+//   - completed:        bool      (required)
+//   - isEstimated:      bool      (required) - position inferred, not read from a player
+//   - updatedAt:        timestamp (required, recent)
+//
+// ===============================================================
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ---------- Helpers ----------
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function hasOnlyAllowedFields(fields) {
+      return request.resource.data.keys().hasOnly(fields);
+    }
+
+    function hasRequiredFields(fields) {
+      return request.resource.data.keys().hasAll(fields);
+    }
+
+    function areImmutableFieldsUnchanged(fields) {
+      return !request.resource.data.diff(resource.data).affectedKeys().hasAny(fields);
+    }
+
+    function isValidEmail(email) {
+      return email is string &&
+        email.matches("^[^@ ]+@[^@ ]+[.][^@ ]+$");
+    }
+
+    function isValidOptionalUrl(field) {
+      return !(field in request.resource.data) ||
+        request.resource.data[field] == null ||
+        (request.resource.data[field] is string &&
+         request.resource.data[field].matches("^https?://.*") &&
+         request.resource.data[field].size() <= 2000);
+    }
+
+    function validStringLength(field, minLen, maxLen) {
+      return request.resource.data[field] is string &&
+        request.resource.data[field].size() >= minLen &&
+        request.resource.data[field].size() <= maxLen;
+    }
+
+    function isPositiveInt(field) {
+      return request.resource.data[field] is int && request.resource.data[field] > 0;
+    }
+
+    function isRecent(time) {
+      return time is timestamp &&
+        time > request.time - duration.value(10, 'm') &&
+        time <= request.time;
+    }
+
+    // ---------- Validators ----------
+
+    function isValidUser() {
+      return hasRequiredFields(['email', 'displayName', 'createdAt', 'updatedAt'])
+        && hasOnlyAllowedFields(['email', 'displayName', 'photoUrl', 'createdAt', 'updatedAt'])
+        && isValidEmail(request.resource.data.email)
+        && validStringLength('displayName', 1, 80)
+        && isValidOptionalUrl('photoUrl')
+        && request.resource.data.createdAt is timestamp
+        && isRecent(request.resource.data.updatedAt);
+    }
+
+    function isValidProfile() {
+      return hasRequiredFields(['name', 'createdAt'])
+        && hasOnlyAllowedFields(['name', 'avatarUrl', 'createdAt'])
+        && validStringLength('name', 1, 40)
+        && isValidOptionalUrl('avatarUrl')
+        && request.resource.data.createdAt is timestamp;
+    }
+
+    // Shared shape for likes and myList: one document per series.
+    function isValidSeriesRef() {
+      return hasRequiredFields(['seriesId', 'createdAt'])
+        && hasOnlyAllowedFields(['seriesId', 'createdAt'])
+        && isPositiveInt('seriesId')
+        && request.resource.data.createdAt is timestamp;
+    }
+
+    function isValidWatchEntry() {
+      return hasRequiredFields(['episodeId', 'seriesId', 'episodeNumber',
+                                'timestampSeconds', 'completed', 'isEstimated', 'updatedAt'])
+        && hasOnlyAllowedFields(['episodeId', 'seriesId', 'episodeNumber',
+                                 'timestampSeconds', 'completed', 'isEstimated', 'updatedAt'])
+        && isPositiveInt('episodeId')
+        && isPositiveInt('seriesId')
+        && request.resource.data.episodeNumber is int
+        && request.resource.data.episodeNumber >= 0
+        && request.resource.data.timestampSeconds is int
+        && request.resource.data.timestampSeconds >= 0
+        // A day of playback is far past any episode; anything beyond is a bug or abuse.
+        && request.resource.data.timestampSeconds <= 86400
+        && request.resource.data.completed is bool
+        && request.resource.data.isEstimated is bool
+        && isRecent(request.resource.data.updatedAt);
+    }
+
+    // ---------- Rules ----------
+
+    match /users/{userId} {
+      allow get: if isOwner(userId);
+      // No listing of the users collection: a signed-in user may only read
+      // their own document, never enumerate other accounts.
+      allow create: if isOwner(userId) && isValidUser();
+      allow update: if isOwner(userId) && isValidUser()
+                    && areImmutableFieldsUnchanged(['email', 'createdAt']);
+      allow delete: if isOwner(userId);
+
+      match /profiles/{profileId} {
+        allow read: if isOwner(userId);
+        allow create, update: if isOwner(userId) && isValidProfile();
+        allow delete: if isOwner(userId);
+
+        match /likes/{seriesId} {
+          allow read: if isOwner(userId);
+          allow create, update: if isOwner(userId) && isValidSeriesRef();
+          allow delete: if isOwner(userId);
+        }
+
+        match /myList/{seriesId} {
+          allow read: if isOwner(userId);
+          allow create, update: if isOwner(userId) && isValidSeriesRef();
+          allow delete: if isOwner(userId);
+        }
+
+        match /watchHistory/{episodeId} {
+          allow read: if isOwner(userId);
+          allow create, update: if isOwner(userId) && isValidWatchEntry();
+          allow delete: if isOwner(userId);
+        }
+      }
+    }
+
+    // Anything not matched above is denied.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

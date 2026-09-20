@@ -1,5 +1,2 @@
-export interface Actor {
-    id: number;
-    name: string;
-    image_url: string | null;
-}
+// Actor now comes from the generated OpenAPI schema so it cannot drift from the API.
+export type { Actor } from './types/models';
