@@ -31,6 +31,7 @@
             android:theme="@style/AppTheme.NoActionBarLaunch"
             android:launchMode="singleTask"
             android:exported="true"
+            android:screenOrientation="sensorPortrait"
             android:hardwareAccelerated="true"
             android:windowSoftInputMode="adjustResize">
 
