@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Play, Download, Star, Share2, Check, History } from 'lucide-react';
+import { Play, Download, Star, Share2, Check, History, AlertTriangle, X } from 'lucide-react';
 import VideoPlayer from '../components/VideoPlayer';
 import api from '../services/api';
 import { getSeriesProgress, recordWatch, type WatchEntry } from '../services/userData';
@@ -21,6 +21,12 @@ export default function SeriesDetail() {
     const [useAlternativeLink, setUseAlternativeLink] = useState(false);
     const [loading, setLoading] = useState(true);
     const [activeSource, setActiveSource] = useState<string>('');
+    const [reportOpen, setReportOpen] = useState(false);
+    const [reportReason, setReportReason] = useState('video_not_playing');
+    const [reportDescription, setReportDescription] = useState('');
+    const [reporting, setReporting] = useState(false);
+    const [reportSent, setReportSent] = useState(false);
+    const [reportError, setReportError] = useState(false);
     const { uid, currentProfile, isAuthenticated } = useAuth();
     const playerRef = useRef<HTMLDivElement>(null);
 
@@ -215,6 +221,29 @@ export default function SeriesDetail() {
         if (!selectedEpisode) return;
         recordHistory(selectedEpisode);
         playerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    };
+
+    const submitPlaybackReport = async (event: React.FormEvent) => {
+        event.preventDefault();
+        if (!series?.id || !selectedEpisode?.id) return;
+        setReporting(true);
+        setReportError(false);
+        try {
+            await api.post('/reports', {
+                series_id: series.id,
+                episode_id: selectedEpisode.id,
+                reason: reportReason,
+                description: reportDescription.trim() || null,
+                source_url: activeSource || null,
+            });
+            setReportSent(true);
+            setReportDescription('');
+        } catch (error) {
+            console.error('Failed to report playback problem:', error);
+            setReportError(true);
+        } finally {
+            setReporting(false);
+        }
     };
 
     if (loading) {
@@ -420,6 +449,21 @@ export default function SeriesDetail() {
                             </button>
                         )}
                     </div>
+
+                    {selectedEpisode && (
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setReportSent(false);
+                                setReportError(false);
+                                setReportOpen(true);
+                            }}
+                            className="inline-flex items-center gap-2 self-start text-sm text-gray-500 hover:text-amber-400 transition-colors"
+                        >
+                            <AlertTriangle className="w-4 h-4" />
+                            Reportar problema neste episódio
+                        </button>
+                    )}
                 </div>
 
                 {/* Episode List */}
@@ -483,6 +527,52 @@ export default function SeriesDetail() {
                     </div>
                 </div>
             </div>
+
+            {reportOpen && selectedEpisode && (
+                <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/75 backdrop-blur-sm p-4" onClick={() => setReportOpen(false)}>
+                    <div className="w-full max-w-md rounded-2xl border border-white/10 bg-[#0d0d0d] p-6 shadow-2xl" onClick={(event) => event.stopPropagation()}>
+                        <div className="mb-5 flex items-start justify-between gap-4">
+                            <div>
+                                <h3 className="text-lg font-bold text-white">Reportar problema</h3>
+                                <p className="mt-1 text-sm text-gray-500">Episódio {selectedEpisode.episode_number} · {series.title}</p>
+                            </div>
+                            <button type="button" onClick={() => setReportOpen(false)} className="rounded-lg p-2 text-gray-500 hover:bg-white/5 hover:text-white" aria-label="Fechar">
+                                <X className="h-4 w-4" />
+                            </button>
+                        </div>
+
+                        {reportSent ? (
+                            <div className="rounded-xl border border-green-500/20 bg-green-500/10 p-4 text-sm text-green-300">
+                                <div className="flex items-center gap-2 font-semibold"><Check className="h-4 w-4" /> Relatório enviado</div>
+                                <p className="mt-1 text-green-300/70">Obrigado. A equipe poderá verificar essa fonte no painel administrativo.</p>
+                                <button type="button" onClick={() => setReportOpen(false)} className="mt-4 rounded-lg bg-green-500/20 px-4 py-2 font-medium hover:bg-green-500/30">Fechar</button>
+                            </div>
+                        ) : (
+                            <form onSubmit={submitPlaybackReport} className="space-y-4">
+                                <label className="block text-sm text-gray-300">
+                                    Tipo do problema
+                                    <select value={reportReason} onChange={(event) => setReportReason(event.target.value)} className="mt-2 w-full rounded-xl border border-white/10 bg-black/40 px-3 py-2.5 text-white outline-none focus:border-amber-500/50">
+                                        <option value="video_not_playing">Vídeo não abre</option>
+                                        <option value="wrong_episode">Episódio incorreto</option>
+                                        <option value="audio_or_subtitle">Áudio ou legenda incorretos</option>
+                                        <option value="poor_quality">Qualidade ruim</option>
+                                        <option value="removed_link">Link removido</option>
+                                        <option value="other">Outro problema</option>
+                                    </select>
+                                </label>
+                                <label className="block text-sm text-gray-300">
+                                    Detalhes <span className="text-gray-600">(opcional)</span>
+                                    <textarea value={reportDescription} onChange={(event) => setReportDescription(event.target.value)} maxLength={500} rows={3} placeholder="Conte o que aconteceu…" className="mt-2 w-full resize-none rounded-xl border border-white/10 bg-black/40 px-3 py-2.5 text-white placeholder:text-gray-700 outline-none focus:border-amber-500/50" />
+                                </label>
+                                {reportError && <p className="text-sm text-red-400">Não foi possível enviar agora. Tente novamente em instantes.</p>}
+                                <button type="submit" disabled={reporting} className="w-full rounded-xl bg-amber-500 px-4 py-2.5 font-bold text-black transition hover:bg-amber-400 disabled:cursor-not-allowed disabled:opacity-50">
+                                    {reporting ? 'Enviando…' : 'Enviar relatório'}
+                                </button>
+                            </form>
+                        )}
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

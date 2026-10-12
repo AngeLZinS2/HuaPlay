@@ -1,0 +1,8 @@
+.git
+**/node_modules
+frontend/dist
+frontend/android
+**/__pycache__
+**/*.pyc
+backend/weifansub.db
+data

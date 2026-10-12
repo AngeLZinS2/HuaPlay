@@ -12,6 +12,9 @@ import {
     X,
     ChevronRight,
     Shield,
+    PanelsTopLeft,
+    AlertTriangle,
+    BarChart3,
 } from 'lucide-react';
 
 interface AdminLayoutProps {
@@ -22,6 +25,9 @@ const navItems = [
     { label: 'Visão Geral', icon: LayoutDashboard, path: '/admin' },
     { label: 'Séries', icon: Tv, path: '/admin/series' },
     { label: 'Atores', icon: Users, path: '/admin/actors' },
+    { label: 'Organizar Home', icon: PanelsTopLeft, path: '/admin/home' },
+    { label: 'Pendências', icon: AlertTriangle, path: '/admin/health' },
+    { label: 'Relatórios', icon: BarChart3, path: '/admin/reports' },
 ];
 
 export default function AdminLayout({ children }: AdminLayoutProps) {

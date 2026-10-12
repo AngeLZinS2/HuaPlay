@@ -141,6 +141,25 @@ export default function SeriesModal({
 
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
+                                    <label className={labelClass}>Publicação</label>
+                                    <select value={formData.publication_status || 'published'} onChange={(e) => update('publication_status', e.target.value)} className={inputClass}>
+                                        <option value="draft">Rascunho</option>
+                                        <option value="review">Em revisão</option>
+                                        <option value="scheduled">Agendada</option>
+                                        <option value="published">Publicada</option>
+                                        <option value="archived">Arquivada</option>
+                                    </select>
+                                </div>
+                                {formData.publication_status === 'scheduled' && (
+                                    <div>
+                                        <label className={labelClass}>Publicar em</label>
+                                        <input type="datetime-local" value={formData.scheduled_at || ''} onChange={(e) => update('scheduled_at', e.target.value || null)} className={inputClass} required />
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
                                     <label className={labelClass}>Ano de Lançamento</label>
                                     <input
                                         type="number"

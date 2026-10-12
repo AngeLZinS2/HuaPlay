@@ -1,5 +1,5 @@
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Save, PlayCircle, Download, Hash } from 'lucide-react';
+import { X, Save, PlayCircle, Download, Hash, AlertTriangle } from 'lucide-react';
 
 interface EpisodeModalProps {
     isOpen: boolean;
@@ -40,6 +40,18 @@ export default function EpisodeModal({
     if (!isOpen) return null;
 
     const update = (field: string, value: any) => setEpisodeData({ ...episodeData, [field]: value });
+    const linkFields = ['embed_url_1', 'embed_url_2', 'youtube_link', 'external_link', 'download_link', 'drive_link', 'mega_link', 'mediafire_link', 'pixeldrain_link'];
+    const invalidLinks = linkFields.filter((field) => {
+        const value = String(episodeData[field] || '').trim();
+        if (!value) return false;
+        try {
+            const url = new URL(value);
+            return !['http:', 'https:'].includes(url.protocol);
+        } catch {
+            return true;
+        }
+    });
+
 
     return (
         <AnimatePresence>
@@ -131,12 +143,33 @@ export default function EpisodeModal({
                             </div>
                         </Section>
 
+                        <Section title="Publicação" icon={Hash}>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className={labelClass}>Estado</label>
+                                    <select value={episodeData.publication_status || 'published'} onChange={(e) => update('publication_status', e.target.value)} className={inputClass}>
+                                        <option value="draft">Rascunho</option>
+                                        <option value="review">Em revisão</option>
+                                        <option value="scheduled">Agendado</option>
+                                        <option value="published">Publicado</option>
+                                        <option value="archived">Arquivado</option>
+                                    </select>
+                                </div>
+                                {episodeData.publication_status === 'scheduled' && (
+                                    <div>
+                                        <label className={labelClass}>Publicar em</label>
+                                        <input type="datetime-local" value={episodeData.scheduled_at || ''} onChange={(e) => update('scheduled_at', e.target.value)} className={inputClass} required />
+                                    </div>
+                                )}
+                            </div>
+                        </Section>
+
                         {/* Online Playback */}
                         <Section title="Reprodução Online (Embeds)" icon={PlayCircle}>
                             <div>
                                 <label className={labelClass}>Embed URL 1</label>
                                 <input
-                                    type="text"
+                                    type="url"
                                     value={episodeData.embed_url_1 || ''}
                                     onChange={(e) => update('embed_url_1', e.target.value)}
                                     className={inputClass}
@@ -146,7 +179,7 @@ export default function EpisodeModal({
                             <div>
                                 <label className={labelClass}>Embed URL 2 (espelho)</label>
                                 <input
-                                    type="text"
+                                    type="url"
                                     value={episodeData.embed_url_2 || ''}
                                     onChange={(e) => update('embed_url_2', e.target.value)}
                                     className={inputClass}
@@ -156,7 +189,7 @@ export default function EpisodeModal({
                             <div>
                                 <label className={labelClass}>YouTube</label>
                                 <input
-                                    type="text"
+                                    type="url"
                                     value={episodeData.youtube_link || ''}
                                     onChange={(e) => update('youtube_link', e.target.value)}
                                     className={inputClass}
@@ -166,7 +199,7 @@ export default function EpisodeModal({
                             <div>
                                 <label className={labelClass}>Link Externo</label>
                                 <input
-                                    type="text"
+                                    type="url"
                                     value={episodeData.external_link || ''}
                                     onChange={(e) => update('external_link', e.target.value)}
                                     className={inputClass}
@@ -175,12 +208,16 @@ export default function EpisodeModal({
                             </div>
                         </Section>
 
+                        {invalidLinks.length > 0 && (
+                            <p className="flex items-center gap-2 text-xs text-amber-400"><AlertTriangle className="w-4 h-4" />Revise as URLs inválidas: {invalidLinks.join(', ')}. Use http:// ou https://</p>
+                        )}
+
                         {/* Downloads */}
                         <Section title="Links de Download" icon={Download}>
                             <div>
                                 <label className={labelClass}>Link de Download Direto</label>
                                 <input
-                                    type="text"
+                                    type="url"
                                     value={episodeData.download_link || ''}
                                     onChange={(e) => update('download_link', e.target.value)}
                                     className={inputClass}
@@ -197,7 +234,7 @@ export default function EpisodeModal({
                                     <div key={key}>
                                         <label className={labelClass}>{label}</label>
                                         <input
-                                            type="text"
+                                            type="url"
                                             value={episodeData[key] || ''}
                                             onChange={(e) => update(key, e.target.value)}
                                             className={inputClass}
@@ -212,7 +249,7 @@ export default function EpisodeModal({
                         <div className="pt-2 pb-1">
                             <button
                                 type="submit"
-                                disabled={saving}
+                                disabled={saving || invalidLinks.length > 0 || (episodeData.publication_status === 'scheduled' && !episodeData.scheduled_at)}
                                 className="w-full py-3 rounded-xl bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white font-bold text-sm flex items-center justify-center gap-2 transition-all shadow-lg shadow-blue-600/20"
                             >
                                 {saving ? (

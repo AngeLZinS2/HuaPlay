@@ -1,55 +1,59 @@
-import { Facebook, Twitter, Instagram, Github } from 'lucide-react';
+import { Github, Linkedin, Mail, MessageSquareWarning } from 'lucide-react';
+import { Link } from 'react-router-dom';
+
+const linkClass = 'text-sm text-gray-400 transition-colors hover:text-primary';
 
 export default function Footer() {
     return (
-        <footer className="bg-surface border-t border-gray-800 mt-20 pt-10 pb-6">
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
+        <footer className="mt-20 border-t border-white/10 bg-surface pb-28 pt-12 md:pb-8">
+            <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+                <div className="grid grid-cols-1 gap-10 sm:grid-cols-2 lg:grid-cols-4">
                     <div>
-                        <h3 className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-primary to-neon-blue mb-4">
-                            HuaPlay
-                        </h3>
-                        <p className="text-gray-400 text-sm">
-                            Sua plataforma de streaming de séries asiáticas com experiência premium e imersiva.
-                        </p>
+                        <Link to="/" className="inline-flex items-center gap-3">
+                            <img src="/Logo Wei.png" alt="HuaPlay" className="h-10 w-10 rounded-full object-cover" />
+                            <span className="font-display text-xl font-bold tracking-wider text-primary">HuaPlay</span>
+                        </Link>
+                        <p className="mt-4 max-w-xs text-sm leading-6 text-gray-400">Catálogo de produções asiáticas com perfis, listas e recomendações personalizadas.</p>
                     </div>
 
                     <div>
-                        <h4 className="text-white font-semibold mb-4">Navegação</h4>
-                        <ul className="space-y-2 text-sm text-gray-400">
-                            <li><a href="#" className="hover:text-primary transition-colors">Home</a></li>
-                            <li><a href="#" className="hover:text-primary transition-colors">Séries populares</a></li>
-                            <li><a href="#" className="hover:text-primary transition-colors">Lançamentos</a></li>
-                            <li><a href="#" className="hover:text-primary transition-colors">Minha Lista</a></li>
+                        <h2 className="mb-4 text-sm font-semibold uppercase tracking-[0.18em] text-white">Navegação</h2>
+                        <ul className="space-y-3">
+                            <li><Link to="/" className={linkClass}>Início</Link></li>
+                            <li><Link to="/explore" className={linkClass}>Explorar</Link></li>
+                            <li><Link to="/schedule" className={linkClass}>Cronograma</Link></li>
+                            <li><Link to="/my-list" className={linkClass}>Minha lista</Link></li>
                         </ul>
                     </div>
 
                     <div>
-                        <h4 className="text-white font-semibold mb-4">Ajuda</h4>
-                        <ul className="space-y-2 text-sm text-gray-400">
-                            <li><a href="#" className="hover:text-primary transition-colors">FAQ</a></li>
-                            <li><a href="#" className="hover:text-primary transition-colors">Termos de Uso</a></li>
-                            <li><a href="#" className="hover:text-primary transition-colors">Privacidade</a></li>
-                            <li><a href="#" className="hover:text-primary transition-colors">Contato</a></li>
+                        <h2 className="mb-4 text-sm font-semibold uppercase tracking-[0.18em] text-white">Informações</h2>
+                        <ul className="space-y-3">
+                            <li><Link to="/faq" className={linkClass}>Perguntas frequentes</Link></li>
+                            <li><Link to="/terms" className={linkClass}>Termos de uso</Link></li>
+                            <li><Link to="/privacy" className={linkClass}>Privacidade</Link></li>
+                            <li><Link to="/copyright" className={linkClass}>Direitos autorais</Link></li>
+                            <li><Link to="/contact" className={linkClass}>Contato</Link></li>
                         </ul>
                     </div>
 
                     <div>
-                        <h4 className="text-white font-semibold mb-4">Social</h4>
-                        <div className="flex space-x-4">
-                            <a href="#" className="text-gray-400 hover:text-primary transition-colors"><Facebook className="w-5 h-5" /></a>
-                            <a href="#" className="text-gray-400 hover:text-primary transition-colors"><Twitter className="w-5 h-5" /></a>
-                            <a href="#" className="text-gray-400 hover:text-primary transition-colors"><Instagram className="w-5 h-5" /></a>
-                            <a href="#" className="text-gray-400 hover:text-primary transition-colors"><Github className="w-5 h-5" /></a>
+                        <h2 className="mb-4 text-sm font-semibold uppercase tracking-[0.18em] text-white">Conecte-se</h2>
+                        <div className="flex gap-3">
+                            <a href="https://github.com/AngeLZinS2" target="_blank" rel="noreferrer" aria-label="GitHub de Angelo Neri" className="rounded-full border border-white/10 p-3 text-gray-400 transition hover:border-primary/60 hover:text-primary"><Github className="h-5 w-5" /></a>
+                            <a href="https://www.linkedin.com/in/angelo-neri-3921a72b9/" target="_blank" rel="noreferrer" aria-label="LinkedIn de Angelo Neri" className="rounded-full border border-white/10 p-3 text-gray-400 transition hover:border-primary/60 hover:text-primary"><Linkedin className="h-5 w-5" /></a>
+                            <a href="mailto:angelo.neri@playdb.info" aria-label="E-mail de contato" className="rounded-full border border-white/10 p-3 text-gray-400 transition hover:border-primary/60 hover:text-primary"><Mail className="h-5 w-5" /></a>
                         </div>
+                        <a href="mailto:angelo.neri@playdb.info" className="mt-4 block break-all text-sm text-gray-400 hover:text-primary">angelo.neri@playdb.info</a>
+                        <button type="button" onClick={() => window.dispatchEvent(new CustomEvent('huaplay:open-report'))} className="mt-5 flex items-center gap-2 text-sm text-gray-400 transition hover:text-primary md:hidden">
+                            <MessageSquareWarning className="h-4 w-4" /> Reportar um problema
+                        </button>
                     </div>
                 </div>
 
-                <div className="border-t border-gray-800 mt-8 pt-8 text-center text-sm text-gray-500">
-                    <p className="mb-4 max-w-4xl mx-auto opacity-70">
-                        O HuaPlay é um projeto exclusivamente acadêmico e funciona como um indexador de links encontrados na web, operando de forma semelhante ao Stremio/Torrent. Não hospedamos nenhum arquivo de vídeo em nossos servidores.
-                    </p>
-                    © {new Date().getFullYear()} HuaPlay. Todos os direitos reservados.
+                <div className="mt-10 border-t border-white/10 pt-7 text-sm text-gray-500">
+                    <p className="max-w-4xl leading-6">O HuaPlay organiza informações e referências disponibilizadas por terceiros. Não hospedamos arquivos de vídeo em nossos servidores. Solicitações fundamentadas de desindexação podem ser enviadas pelo canal de contato.</p>
+                    <p className="mt-4">© {new Date().getFullYear()} HuaPlay. Todos os direitos reservados.</p>
                 </div>
             </div>
         </footer>

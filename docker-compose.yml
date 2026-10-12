@@ -1,0 +1,19 @@
+services:
+  backend:
+    build: ./backend
+    restart: unless-stopped
+    environment:
+      FIREBASE_PROJECT_ID: gtavi-6991d
+    volumes:
+      - ./data/weifansub.db:/app/weifansub.db
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        VITE_API_URL: /api
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "8084:80"

@@ -1,10 +1,25 @@
 <!doctype html>
-<html lang="en">
+<html lang="pt-BR">
 
 <head>
   <meta charset="UTF-8" />
   <link rel="icon" type="image/png" href="/sakura.png" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <script>
+    // Some Android browsers keep a desktop-sized virtual viewport even on a
+    // phone. Detect handheld touch hardware before the app and CSS load, then
+    // cap that virtual viewport so responsive mobile breakpoints still apply.
+    (function () {
+      var shortestSide = Math.min(screen.width || 9999, screen.height || 9999);
+      var isHandheld = navigator.maxTouchPoints > 0 && shortestSide <= 1024;
+      if (!isHandheld) return;
+
+      var viewport = document.querySelector('meta[name="viewport"]');
+      var mobileWidth = Math.min(shortestSide, 480);
+      viewport.setAttribute('content', 'width=' + mobileWidth + ', initial-scale=1.0, viewport-fit=cover');
+      document.documentElement.classList.add('mobile-device');
+    })();
+  </script>
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">

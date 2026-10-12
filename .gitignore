@@ -36,3 +36,6 @@ frontend/android/local.properties
 
 # PWA dev build
 frontend/dev-dist/
+
+# Temporary local artifacts
+tmp/

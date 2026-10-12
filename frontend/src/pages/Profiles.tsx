@@ -1,59 +1,33 @@
-import { useState, useMemo } from 'react';
+import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Plus, Edit2, X, LogOut } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { createProfile, deleteProfile, updateProfile } from '../services/userData';
+import api from '../services/api';
+import { getOptimizedImageUrl } from '../utils/image';
 
-// --- Particle Component with Gold Theme ---
-const ParticlesBackground = () => {
-    const particles = useMemo(() => {
-        return Array.from({ length: 50 }).map((_, i) => ({
-            id: i,
-            x: Math.random() * 100,
-            y: Math.random() * 100,
-            size: Math.random() * 3 + 1,
-            duration: Math.random() * 10 + 10,
-            delay: Math.random() * 5,
-            opacity: Math.random() * 0.5 + 0.3
-        }));
-    }, []);
+type BackgroundSeries = { id: number; title: string; banner_image?: string | null; cover_image?: string | null };
 
+const CinematicBackground = ({ items, activeIndex }: { items: BackgroundSeries[]; activeIndex: number }) => {
+    const active = items[activeIndex];
     return (
-        <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
-            {/* Rich Dark Golden Background */}
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,#2c2005_0%,#1a1202_40%,#000000_100%)]" />
-
-            {/* Subtle Cloud-like Texture Overlay (CSS Pattern) */}
-            <div className="absolute inset-0 opacity-10 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] mix-blend-overlay" />
-
-            {particles.map((p) => (
-                <motion.div
-                    key={p.id}
-                    className="absolute rounded-full shadow-[0_0_8px_#FFD700]"
-                    style={{
-                        left: `${p.x}%`,
-                        top: `${p.y}%`,
-                        width: p.size,
-                        height: p.size,
-                        backgroundColor: '#FFD700', // Gold color
-                    }}
-                    animate={{
-                        y: [0, -60, 0],
-                        opacity: [p.opacity, p.opacity * 1.5, p.opacity],
-                        scale: [1, 1.2, 1],
-                    }}
-                    transition={{
-                        duration: p.duration,
-                        repeat: Infinity,
-                        ease: "linear",
-                        delay: p.delay,
-                    }}
-                />
-            ))}
-
-            {/* Vignette for cinematic focus */}
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_0%,rgba(0,0,0,0.8)_100%)]" />
+        <div className="pointer-events-none absolute inset-0 z-0 overflow-hidden bg-black">
+            <AnimatePresence initial={false} mode="sync">
+                {active && <motion.div key={active.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ opacity: { duration: 1.8, ease: 'easeInOut' } }} className="absolute inset-0">
+                    <motion.img
+                        src={getOptimizedImageUrl(active.banner_image || active.cover_image, 'backdrop')}
+                        alt=""
+                        initial={{ scale: 1.14 }}
+                        animate={{ scale: 1 }}
+                        transition={{ scale: { duration: 8, ease: 'easeOut' } }}
+                        className="h-[72%] w-full object-cover object-center sm:h-full"
+                    />
+                </motion.div>}
+            </AnimatePresence>
+            {!active && <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,#302006_0%,#080604_50%,#000_100%)]" />}
+            <div className="absolute inset-0 bg-gradient-to-b from-black/15 via-black/10 via-45% to-black to-75% sm:bg-gradient-to-r sm:from-black/20 sm:via-black/35 sm:to-black/80" />
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_20%,rgba(0,0,0,.55)_100%)]" />
         </div>
     );
 };
@@ -68,6 +42,21 @@ export default function Profiles() {
     const [editingProfile, setEditingProfile] = useState<any | null>(null);
     const [editProfileName, setEditProfileName] = useState('');
     const [editAvatarUrl, setEditAvatarUrl] = useState('');
+    const [backgrounds, setBackgrounds] = useState<BackgroundSeries[]>([]);
+    const [activeBackground, setActiveBackground] = useState(0);
+
+    useEffect(() => {
+        api.get('/series/', { params: { limit: 30, skip: 0 } }).then(response => {
+            const usable = (response.data || []).filter((item: BackgroundSeries) => item.banner_image || item.cover_image);
+            setBackgrounds(usable.sort(() => Math.random() - 0.5).slice(0, 12));
+        }).catch(error => console.error('Failed to load profile backgrounds', error));
+    }, []);
+
+    useEffect(() => {
+        if (backgrounds.length < 2) return;
+        const timer = window.setInterval(() => setActiveBackground(current => (current + 1) % backgrounds.length), 7500);
+        return () => window.clearInterval(timer);
+    }, [backgrounds]);
 
     const handleSelectProfile = (profile: any) => {
         if (isManaging) {
@@ -123,8 +112,8 @@ export default function Profiles() {
     };
 
     return (
-        <div className="relative min-h-screen bg-black flex flex-col items-center justify-center p-4 overflow-hidden font-serif text-[#E5D5A6] selection:bg-[#D4AF37] selection:text-black">
-            <ParticlesBackground />
+        <div className="relative min-h-[100svh] bg-black flex flex-col items-center justify-end px-4 pb-12 pt-24 overflow-hidden font-sans text-white selection:bg-[#D4AF37] selection:text-black sm:justify-center sm:p-6">
+            <CinematicBackground items={backgrounds} activeIndex={activeBackground} />
 
             {/* Top decorative line */}
             <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-[#AD892D] to-transparent opacity-60" />
@@ -135,24 +124,24 @@ export default function Profiles() {
                 animate={{ opacity: 1 }}
                 transition={{ delay: 0.5 }}
                 onClick={() => { logout(); navigate('/login'); }}
-                className="absolute top-4 right-4 z-20 flex items-center gap-2 px-4 py-2 rounded-xl text-sm text-[#B8860B] border border-[#B8860B]/30 hover:border-[#FFD700]/60 hover:text-[#FFD700] hover:bg-[#FFD700]/5 transition-all duration-300"
+                className="absolute top-[max(1rem,env(safe-area-inset-top))] right-4 z-20 flex items-center gap-2 rounded-full border border-white/20 bg-black/30 px-3 py-2 text-xs text-white/80 backdrop-blur-md transition hover:bg-black/60 hover:text-white sm:px-4 sm:text-sm"
             >
                 <LogOut className="w-4 h-4" />
                 Sair
             </motion.button>
 
-            <div className="relative z-10 w-full max-w-6xl flex flex-col items-center">
+            <div className="relative z-10 flex w-full max-w-6xl flex-col items-center">
                 <motion.h1
                     initial={{ opacity: 0, y: -30 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 1, ease: "easeOut" }}
-                    className="text-5xl md:text-7xl font-medium tracking-wide mb-24 text-transparent bg-clip-text bg-gradient-to-b from-[#FFF8DC] to-[#B8860B] drop-shadow-[0_2px_10px_rgba(0,0,0,0.8)] text-center font-display"
+                    className="mb-7 text-center text-2xl font-medium tracking-wide text-white drop-shadow-[0_2px_10px_rgba(0,0,0,0.9)] sm:mb-16 sm:text-5xl md:text-6xl"
                 >
-                    Quem está assistindo?
+                    Escolha o seu perfil
                 </motion.h1>
 
                 <motion.div
-                    className="flex flex-wrap justify-center gap-12 md:gap-20"
+                    className="grid w-full max-w-md grid-cols-3 justify-items-center gap-x-4 gap-y-7 sm:max-w-4xl sm:flex sm:flex-wrap sm:justify-center sm:gap-12 md:gap-16"
                     initial="hidden"
                     animate="visible"
                     variants={{
@@ -171,13 +160,13 @@ export default function Profiles() {
                                 visible: { opacity: 1, scale: 1, y: 0 }
                             }}
                             whileHover={{ scale: 1.1, zIndex: 20 }}
-                            className="group relative flex flex-col items-center gap-6 cursor-pointer"
+                            className="group relative flex min-w-0 flex-col items-center gap-2.5 cursor-pointer sm:gap-5"
                             onClick={() => handleSelectProfile(profile)}
                         >
                             {/* Ornate Gold Frame Container */}
-                            <div className={`relative p-[3px] rounded-xl transition-all duration-500 ${isManaging ? 'opacity-80' : ''} bg-gradient-to-b from-[#FFD700] via-[#F6E27A] to-[#B8860B] shadow-[0_0_25px_rgba(218,165,32,0.3)] group-hover:shadow-[0_0_50px_rgba(255,215,0,0.6)]`}>
+                            <div className={`relative rounded-xl border-2 border-transparent transition-all duration-300 ${isManaging ? 'opacity-80' : ''} group-hover:border-white`}>
                                 {/* Inner Card Border */}
-                                <div className="relative w-36 h-36 md:w-52 md:h-52 bg-black rounded-[9px] overflow-hidden border border-[#D4AF37]/30">
+                                <div className="relative h-24 w-24 overflow-hidden rounded-[10px] bg-[#29251f] shadow-xl sm:h-36 sm:w-36 md:h-44 md:w-44">
                                     <img
                                         src={profile.avatarUrl ?? undefined}
                                         alt={profile.name}
@@ -198,7 +187,7 @@ export default function Profiles() {
                                 </div>
                             </div>
 
-                            <span className="text-xl md:text-2xl font-medium tracking-widest text-[#D4AF37] group-hover:text-[#FFF8DC] transition-colors duration-300 drop-shadow-md">
+                            <span className="max-w-24 truncate text-sm font-semibold text-white transition-colors group-hover:text-[#f2c94c] sm:max-w-44 sm:text-xl">
                                 {profile.name}
                             </span>
                         </motion.div>
@@ -213,14 +202,14 @@ export default function Profiles() {
                             }}
                             whileHover={{ scale: 1.05 }}
                             whileTap={{ scale: 0.95 }}
-                            className="flex flex-col items-center gap-6 cursor-pointer group"
+                            className="flex flex-col items-center gap-2.5 cursor-pointer group sm:gap-5"
                             onClick={() => setIsCreating(true)}
                         >
                             {/* Similar Frame style for consistency but outlined */}
-                            <div className="relative w-36 h-36 md:w-52 md:h-52 rounded-xl border-2 border-dashed border-[#D4AF37]/50 flex items-center justify-center bg-black/40 group-hover:bg-[#D4AF37]/10 group-hover:border-[#D4AF37] transition-all duration-300 shadow-[0_0_15px_rgba(218,165,32,0.1)] group-hover:shadow-[0_0_30px_rgba(218,165,32,0.4)]">
-                                <Plus className="w-16 h-16 text-[#D4AF37] opacity-70 group-hover:opacity-100 transition-opacity duration-300" />
+                            <div className="relative flex h-24 w-24 items-center justify-center rounded-[10px] border-2 border-dashed border-white/30 bg-black/35 backdrop-blur-sm transition group-hover:border-white sm:h-36 sm:w-36 md:h-44 md:w-44">
+                                <Plus className="h-10 w-10 text-white/70 transition-opacity group-hover:text-white sm:h-14 sm:w-14" />
                             </div>
-                            <span className="text-xl md:text-2xl font-light text-[#D4AF37]/70 group-hover:text-[#D4AF37] transition-colors tracking-widest">
+                            <span className="text-sm font-semibold text-white/80 transition-colors group-hover:text-white sm:text-xl">
                                 Adicionar
                             </span>
                         </motion.div>
@@ -233,7 +222,7 @@ export default function Profiles() {
                     animate={{ opacity: 1 }}
                     transition={{ delay: 1.2, duration: 0.8 }}
                     onClick={() => setIsManaging(!isManaging)}
-                    className="mt-24 px-12 py-3 border border-[#D4AF37]/40 text-[#D4AF37] hover:bg-[#D4AF37] hover:text-black transition-all duration-500 uppercase tracking-[0.2em] text-sm font-semibold rounded-sm hover:shadow-[0_0_20px_#D4AF37]"
+                    className="mt-9 rounded-lg border border-white/30 bg-black/25 px-7 py-2.5 text-xs font-semibold uppercase tracking-[0.16em] text-white/80 backdrop-blur-sm transition hover:border-white hover:text-white sm:mt-16 sm:px-10 sm:text-sm"
                 >
                     {isManaging ? 'Concluído' : 'Gerenciar Perfis'}
                 </motion.button>

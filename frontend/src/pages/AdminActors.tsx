@@ -35,7 +35,9 @@ export default function AdminActors() {
     const fetchActors = useCallback(async () => {
         setLoading(true);
         try {
-            const res = await api.get('/actors/');
+            // The API defaults to 100 records. The first 100 happen to be
+            // actresses, so the admin page looked as if no actors existed.
+            const res = await api.get('/actors/', { params: { limit: 1000 } });
             setActorList(Array.isArray(res.data) ? res.data : []);
         } catch {
             addToast('Erro ao carregar atores.', 'error');

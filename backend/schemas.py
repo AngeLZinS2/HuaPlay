@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import List, Optional, Literal
 from pydantic import BaseModel, field_validator
 from datetime import datetime
 
@@ -31,6 +31,8 @@ class SeriesBase(BaseModel):
 
     is_featured: bool = False
     views_count: Optional[int] = 0
+    publication_status: Literal["draft", "review", "scheduled", "published", "archived"] = "published"
+    scheduled_at: Optional[datetime] = None
 
     @field_validator("slug", mode="before")
     @classmethod
@@ -70,6 +72,38 @@ class FeaturedConfigResponse(FeaturedConfigBase):
     class Config:
         from_attributes = True
 
+class HomeSectionBase(BaseModel):
+    title: str
+    section_type: Literal["latest", "popular", "genre", "type", "country", "status", "manual"] = "latest"
+    filter_value: Optional[str] = None
+    series_ids: Optional[str] = None
+    item_limit: int = 18
+    position: int = 0
+    is_active: bool = True
+
+class HomeSectionCreate(HomeSectionBase):
+    pass
+
+class HomeSectionUpdate(BaseModel):
+    title: Optional[str] = None
+    section_type: Optional[Literal["latest", "popular", "genre", "type", "country", "status", "manual"]] = None
+    filter_value: Optional[str] = None
+    series_ids: Optional[str] = None
+    item_limit: Optional[int] = None
+    position: Optional[int] = None
+    is_active: Optional[bool] = None
+
+class HomeSection(HomeSectionBase):
+    id: int
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+    items: List[Series] = []
+    class Config:
+        from_attributes = True
+
+class HomeSectionReorder(BaseModel):
+    ids: List[int]
+
 class EpisodeBase(BaseModel):
     title: str
     episode_number: int
@@ -85,6 +119,41 @@ class EpisodeBase(BaseModel):
     mediafire_link: Optional[str] = None
     pixeldrain_link: Optional[str] = None
     youtube_link: Optional[str] = None
+    publication_status: Literal["draft", "review", "scheduled", "published", "archived"] = "published"
+    scheduled_at: Optional[datetime] = None
+
+class PlaybackReportCreate(BaseModel):
+    series_id: Optional[int] = None
+    episode_id: Optional[int] = None
+    reporter_email: Optional[str] = None
+    category: str = "playback"
+    reason: Optional[str] = None
+    message: Optional[str] = None
+    description: Optional[str] = None
+    page_url: Optional[str] = None
+    source_url: Optional[str] = None
+
+class PlaybackReportUpdate(BaseModel):
+    status: Optional[str] = None
+    admin_note: Optional[str] = None
+
+class PlaybackReport(BaseModel):
+    id: int
+    series_id: Optional[int] = None
+    episode_id: Optional[int] = None
+    reporter_email: Optional[str] = None
+    category: str
+    reason: Optional[str] = None
+    message: Optional[str] = None
+    description: Optional[str] = None
+    page_url: Optional[str] = None
+    source_url: Optional[str] = None
+    status: str
+    admin_note: Optional[str] = None
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+    class Config:
+        from_attributes = True
 
 class EpisodeCreate(EpisodeBase):
     pass

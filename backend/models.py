@@ -72,6 +72,10 @@ class Series(Base):
     is_featured = Column(Boolean, default=False) # Only one series should be true
     views_count = Column(Integer, default=0)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+    # Published is the legacy-safe default: existing catalog behavior remains
+    # unchanged until an editor explicitly moves an item into a workflow state.
+    publication_status = Column(String, default="published", nullable=False)
+    scheduled_at = Column(DateTime(timezone=True), nullable=True)
 
     episodes = relationship("Episode", back_populates="series", cascade="all, delete-orphan")
     likes = relationship("Like", back_populates="series")
@@ -106,6 +110,9 @@ class Episode(Base):
     mediafire_link = Column(String, nullable=True)
     pixeldrain_link = Column(String, nullable=True)
     youtube_link = Column(String, nullable=True)
+
+    publication_status = Column(String, default="published", nullable=False)
+    scheduled_at = Column(DateTime(timezone=True), nullable=True)
 
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
@@ -173,4 +180,40 @@ class FeaturedConfig(Base):
     manual_series_id = Column(Integer, ForeignKey("series.id"), nullable=True)
 
     manual_series = relationship("Series")
+
+
+class PlaybackReport(Base):
+    __tablename__ = "playback_reports"
+
+    id = Column(Integer, primary_key=True, index=True)
+    series_id = Column(Integer, ForeignKey("series.id", ondelete="SET NULL"), nullable=True, index=True)
+    episode_id = Column(Integer, ForeignKey("episodes.id", ondelete="SET NULL"), nullable=True, index=True)
+    reporter_email = Column(String, nullable=True, index=True)
+    category = Column(String, nullable=False, default="playback")
+    reason = Column(String, nullable=True)
+    message = Column(Text, nullable=True)
+    page_url = Column(String, nullable=True)
+    source_url = Column(String, nullable=True)
+    status = Column(String, nullable=False, default="open", index=True)
+    admin_note = Column(Text, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+    series = relationship("Series")
+    episode = relationship("Episode")
+
+
+class HomeSection(Base):
+    __tablename__ = "home_sections"
+
+    id = Column(Integer, primary_key=True, index=True)
+    title = Column(String, nullable=False)
+    section_type = Column(String, nullable=False, default="latest")
+    filter_value = Column(String, nullable=True)
+    series_ids = Column(Text, nullable=True)
+    item_limit = Column(Integer, nullable=False, default=18)
+    position = Column(Integer, nullable=False, default=0, index=True)
+    is_active = Column(Boolean, nullable=False, default=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 

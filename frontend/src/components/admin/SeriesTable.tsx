@@ -123,6 +123,14 @@ export default function SeriesTable({
                                             <div>
                                                 <p className="text-sm font-medium text-white">{item.title}</p>
                                                 <p className="text-xs text-gray-600">#{item.id}</p>
+                                                <div className="flex flex-wrap gap-1 mt-1">
+                                                    <span className={`text-[10px] px-1.5 py-0.5 rounded border ${item.publication_status === 'draft' ? 'bg-gray-500/10 text-gray-400 border-gray-500/20' : item.publication_status === 'review' ? 'bg-amber-500/10 text-amber-300 border-amber-500/20' : item.publication_status === 'scheduled' ? 'bg-blue-500/10 text-blue-300 border-blue-500/20' : item.publication_status === 'archived' ? 'bg-red-500/10 text-red-300 border-red-500/20' : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'}`}>
+                                                        {item.publication_status === 'draft' ? 'Rascunho' : item.publication_status === 'review' ? 'Em revisão' : item.publication_status === 'scheduled' ? 'Agendada' : item.publication_status === 'archived' ? 'Arquivada' : 'Publicada'}
+                                                    </span>
+                                                    {item.publication_status === 'scheduled' && item.scheduled_at && (
+                                                        <span className="text-[10px] text-blue-300">{new Date(item.scheduled_at).toLocaleString('pt-BR')}</span>
+                                                    )}
+                                                </div>
                                             </div>
                                         </td>
 

@@ -1,5 +1,5 @@
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Plus, Edit, Trash2, List, PlayCircle, Download } from 'lucide-react';
+import { X, Plus, Edit, Trash2, List, PlayCircle, Download, Copy, AlertTriangle } from 'lucide-react';
 import { getOptimizedImageUrl } from '../../utils/image';
 
 interface EpisodeManagerProps {
@@ -10,6 +10,7 @@ interface EpisodeManagerProps {
     onAddEpisode: () => void;
     onEditEpisode: (episode: any) => void;
     onDeleteEpisode: (id: number) => void;
+    onDuplicateEpisode: (episode: any) => void;
 }
 
 function LinkBadge({ label, color }: { label: string; color: string }) {
@@ -28,7 +29,14 @@ export default function EpisodeManager({
     onAddEpisode,
     onEditEpisode,
     onDeleteEpisode,
+    onDuplicateEpisode,
 }: EpisodeManagerProps) {
+    const linkCount = (ep: any) => [ep.embed_url_1, ep.embed_url_2, ep.youtube_link, ep.external_link, ep.drive_link, ep.mega_link, ep.mediafire_link, ep.pixeldrain_link, ep.download_link].filter((link) => String(link || '').trim()).length;
+    const sourceQuality = (count: number) => count === 0
+        ? { label: 'Sem fonte', color: 'bg-amber-500/10 text-amber-400 border-amber-500/20' }
+        : count === 1
+            ? { label: 'Fonte única', color: 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20' }
+            : { label: 'Fontes redundantes', color: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' };
     return (
         <AnimatePresence>
             {isOpen && managingSeries && (
@@ -99,10 +107,16 @@ export default function EpisodeManager({
                                             {/* Info */}
                                             <div className="flex-1 min-w-0">
                                                 <p className="text-sm font-medium text-white truncate">{ep.title}</p>
+                                                <div className="flex flex-wrap items-center gap-1 mt-1">
+                                                    <LinkBadge label={ep.publication_status === 'draft' ? 'Rascunho' : ep.publication_status === 'review' ? 'Em revisão' : ep.publication_status === 'scheduled' ? 'Agendado' : ep.publication_status === 'archived' ? 'Arquivado' : 'Publicado'} color={ep.publication_status === 'draft' ? 'bg-gray-500/10 text-gray-400 border-gray-500/20' : ep.publication_status === 'review' ? 'bg-amber-500/10 text-amber-300 border-amber-500/20' : ep.publication_status === 'scheduled' ? 'bg-blue-500/10 text-blue-300 border-blue-500/20' : ep.publication_status === 'archived' ? 'bg-red-500/10 text-red-300 border-red-500/20' : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'} />
+                                                    <LinkBadge label={sourceQuality(linkCount(ep)).label} color={sourceQuality(linkCount(ep)).color} />
+                                                    {linkCount(ep) === 0 && <span className="inline-flex items-center gap-1 text-[10px] text-amber-400"><AlertTriangle className="w-3 h-3" />Sem link</span>}
+                                                </div>
                                                 <div className="flex flex-wrap gap-1 mt-1.5">
                                                     {ep.embed_url_1 && <LinkBadge label="Embed 1" color="bg-blue-500/10 text-blue-400 border-blue-500/20" />}
                                                     {ep.embed_url_2 && <LinkBadge label="Embed 2" color="bg-indigo-500/10 text-indigo-400 border-indigo-500/20" />}
                                                     {ep.youtube_link && <LinkBadge label="YouTube" color="bg-red-500/10 text-red-400 border-red-500/20" />}
+                                                    {ep.external_link && <LinkBadge label="Externo" color="bg-cyan-500/10 text-cyan-400 border-cyan-500/20" />}
                                                     {ep.drive_link && <LinkBadge label="Drive" color="bg-green-500/10 text-green-400 border-green-500/20" />}
                                                     {ep.mega_link && <LinkBadge label="Mega" color="bg-orange-500/10 text-orange-400 border-orange-500/20" />}
                                                     {ep.mediafire_link && <LinkBadge label="MF" color="bg-sky-500/10 text-sky-400 border-sky-500/20" />}
@@ -113,6 +127,9 @@ export default function EpisodeManager({
 
                                             {/* Actions */}
                                             <div className="flex items-center gap-1 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity mt-0.5">
+                                                <button onClick={() => onDuplicateEpisode(ep)} title="Duplicar como modelo" className="p-1.5 rounded-lg text-gray-600 hover:text-emerald-400 hover:bg-emerald-400/10 transition-all">
+                                                    <Copy className="w-3.5 h-3.5" />
+                                                </button>
                                                 <button
                                                     onClick={() => onEditEpisode(ep)}
                                                     className="p-1.5 rounded-lg text-gray-600 hover:text-blue-400 hover:bg-blue-400/10 transition-all"

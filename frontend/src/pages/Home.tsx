@@ -16,6 +16,8 @@ export default function Home() {
     const [trending, setTrending] = useState<any[]>([]);
     const [newReleases, setNewReleases] = useState<any[]>([]);
     const [wuxiaRow, setWuxiaRow] = useState<any[]>([]);
+    const [managedRows, setManagedRows] = useState<Array<{ id: number; title: string; items: any[] }>>([]);
+    const [hasManagedHome, setHasManagedHome] = useState(false);
     const [loading, setLoading] = useState(true);
     const { openModal } = useModal();
 
@@ -38,12 +40,47 @@ export default function Home() {
         }));
     };
 
+    // Updating My List or likes must not rerun the initial catalog request. That
+    // used to put the whole page back into its full-screen loading state, which
+    // looked like a browser refresh after every click.
     useEffect(() => {
-        const fetchHomeData = async () => {
-            setLoading(true);
+        const fetchCatalogRows = async () => {
             try {
-                // 1. Recommendations. The taste signals live in Firestore now, so
-                // they are gathered here and posted to the stateless recommender.
+                const [allRes, wuxiaRes, homeSectionsRes] = await Promise.all([
+                    api.get('/series/?limit=40'),
+                    api.get('/series/?genre=Wuxia&limit=20'),
+                    api.get('/home/sections').catch(() => ({ data: [] })),
+                ]);
+
+                const allItems = formatSeries(allRes.data || []);
+                const shuffledTrending = [...allItems].sort(() => 0.5 - Math.random());
+                setTrending(shuffledTrending.slice(0, 18));
+
+                const sortedNew = [...allItems].sort((a, b) => (b.release_year || 0) - (a.release_year || 0));
+                setNewReleases(sortedNew.slice(0, 18));
+                setWuxiaRow(formatSeries(wuxiaRes.data || []));
+                const sections = Array.isArray(homeSectionsRes.data) ? homeSectionsRes.data : [];
+                setHasManagedHome(sections.length > 0);
+                setManagedRows(sections.map((section: any) => ({
+                    id: section.id,
+                    title: section.title,
+                    items: formatSeries(section.items || []),
+                })));
+            } catch (error) {
+                console.error("Failed to fetch homepage catalog:", error);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchCatalogRows();
+        // The catalog rows are public and do not depend on list/profile changes.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
+    useEffect(() => {
+        const fetchRecommendations = async () => {
+            try {
                 let recData;
                 if (uid && currentProfile) {
                     const history = await getRecentlyWatched(uid, currentProfile.id, 40);
@@ -69,32 +106,12 @@ export default function Home() {
                 } else {
                     setBecauseYouWatched(null);
                 }
-
-                // 2. Fetch General rows
-                const [allRes, wuxiaRes] = await Promise.all([
-                    api.get('/series/?limit=40'),
-                    api.get('/series/?genre=Wuxia&limit=20')
-                ]);
-
-                const allItems = formatSeries(allRes.data || []);
-                // Shuffle trending slightly for dynamic feel
-                const shuffledTrending = [...allItems].sort(() => 0.5 - Math.random());
-                setTrending(shuffledTrending.slice(0, 18));
-
-                // Sort new releases by year / id desc
-                const sortedNew = [...allItems].sort((a, b) => (b.release_year || 0) - (a.release_year || 0));
-                setNewReleases(sortedNew.slice(0, 18));
-
-                setWuxiaRow(formatSeries(wuxiaRes.data || []));
-
             } catch (error) {
                 console.error("Failed to fetch homepage recommendations:", error);
-            } finally {
-                setLoading(false);
             }
         };
 
-        fetchHomeData();
+        fetchRecommendations();
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [uid, currentProfile?.id, myLikeIds, myListIds]);
 
@@ -160,8 +177,18 @@ export default function Home() {
                     />
                 )}
 
-                {/* 3. Em Alta & Populares */}
-                {trending.length > 0 && (
+                {/* Fileiras editoriais configuradas no Painel Admin */}
+                {managedRows.map((row) => row.items.length > 0 && (
+                    <SeriesRow
+                        key={row.id}
+                        title={row.title}
+                        series={row.items}
+                        onOpenModal={handleOpenModal}
+                    />
+                ))}
+
+                {/* Compatibilidade: fileiras antigas enquanto a Home não foi configurada */}
+                {!hasManagedHome && trending.length > 0 && (
                     <SeriesRow
                         title="Em Alta no HuaPlay"
                         series={trending}
@@ -170,7 +197,7 @@ export default function Home() {
                 )}
 
                 {/* 4. Novos Lançamentos */}
-                {newReleases.length > 0 && (
+                {!hasManagedHome && newReleases.length > 0 && (
                     <SeriesRow
                         title="Novos Lançamentos"
                         series={newReleases}
@@ -179,7 +206,7 @@ export default function Home() {
                 )}
 
                 {/* 5. Wuxia & Fantasia */}
-                {wuxiaRow.length > 0 && (
+                {!hasManagedHome && wuxiaRow.length > 0 && (
                     <SeriesRow
                         title="Dramas de Época, Wuxia & Xianxia"
                         series={wuxiaRow}

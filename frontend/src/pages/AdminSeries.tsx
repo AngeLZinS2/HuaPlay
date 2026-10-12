@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
+import { useSearchParams } from 'react-router-dom';
 import api, {
     createEpisode,
     deleteEpisode,
@@ -28,6 +29,8 @@ const DEFAULT_SERIES_FORM = {
     description: '',
     type: 'Series',
     status: 'Em andamento',
+    publication_status: 'published',
+    scheduled_at: '',
     release_year: new Date().getFullYear(),
     country: '',
     genre: '',
@@ -55,10 +58,13 @@ const DEFAULT_EPISODE_FORM = {
     mega_link: '',
     mediafire_link: '',
     pixeldrain_link: '',
+    publication_status: 'published',
+    scheduled_at: '',
 };
 
 export default function AdminSeries() {
     const { addToast } = useToast();
+    const [searchParams, setSearchParams] = useSearchParams();
 
     // Data
     const [seriesList, setSeriesList] = useState<any[]>([]);
@@ -145,6 +151,8 @@ export default function AdminSeries() {
             description: item.description || '',
             type: item.type || 'Series',
             status: item.status || 'Em andamento',
+            publication_status: item.publication_status || 'published',
+            scheduled_at: item.scheduled_at ? new Date(item.scheduled_at).toISOString().slice(0, 16) : '',
             release_year: item.release_year || new Date().getFullYear(),
             country: item.country || '',
             genre: item.genre || '',
@@ -159,6 +167,27 @@ export default function AdminSeries() {
         });
         setIsSeriesModalOpen(true);
     };
+
+    // The health center links straight to a series, which may not be present on
+    // the current paginated table. Fetch it by id and open the editor directly.
+    useEffect(() => {
+        const editId = searchParams.get('edit');
+        if (!editId || !/^\d+$/.test(editId)) return;
+        let active = true;
+        api.get(`/series/${editId}`)
+            .then((response) => {
+                if (active) handleEditSeries(response.data);
+            })
+            .catch(() => {
+                if (active) addToast('Não foi possível abrir esta série para revisão.', 'error');
+            })
+            .finally(() => {
+                if (active) setSearchParams({}, { replace: true });
+            });
+        return () => { active = false; };
+        // Run once for each requested id; handleEditSeries only fills the form.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [searchParams, setSearchParams, addToast]);
 
     // A bare `catch {}` hid why a save failed — a 403 from an expired admin
     // session and a 422 from a rejected field both surfaced as the same
@@ -177,11 +206,17 @@ export default function AdminSeries() {
         e.preventDefault();
         setSaving(true);
         try {
+            const payload = {
+                ...formData,
+                scheduled_at: formData.publication_status === 'scheduled' && formData.scheduled_at
+                    ? new Date(formData.scheduled_at).toISOString()
+                    : null,
+            };
             if (editingSeriesId) {
-                await api.put(`/series/${editingSeriesId}`, formData);
+                await api.put(`/series/${editingSeriesId}`, payload);
                 addToast('Série atualizada com sucesso!', 'success');
             } else {
-                await api.post('/series/', formData);
+                await api.post('/series/', payload);
                 addToast('Série criada com sucesso!', 'success');
             }
             setIsSeriesModalOpen(false);
@@ -259,6 +294,24 @@ export default function AdminSeries() {
             mega_link: ep.mega_link || '',
             mediafire_link: ep.mediafire_link || '',
             pixeldrain_link: ep.pixeldrain_link || '',
+            publication_status: ep.publication_status || 'published',
+            scheduled_at: ep.scheduled_at ? new Date(ep.scheduled_at).toISOString().slice(0, 16) : '',
+        });
+        setIsEpisodeManagerOpen(false);
+        setIsEpisodeModalOpen(true);
+    };
+
+    const handleDuplicateEpisode = (ep: any) => {
+        const { id: _id, ...template } = ep;
+        setEditingEpisodeId(null);
+        setEpisodeData({
+            ...DEFAULT_EPISODE_FORM,
+            ...template,
+            series_id: String(ep.series_id ?? managingSeries?.id ?? ''),
+            episode_number: Math.max(0, ...episodeList.map((item) => Number(item.episode_number) || 0)) + 1,
+            title: `${ep.title || 'Episódio'} (cópia)`,
+            publication_status: 'draft',
+            scheduled_at: '',
         });
         setIsEpisodeManagerOpen(false);
         setIsEpisodeModalOpen(true);
@@ -273,6 +326,9 @@ export default function AdminSeries() {
                 series_id: parseInt(episodeData.series_id),
                 episode_number: parseInt(episodeData.episode_number.toString()),
                 season_number: parseInt((episodeData.season_number ?? 1).toString()),
+                scheduled_at: episodeData.publication_status === 'scheduled' && episodeData.scheduled_at
+                    ? new Date(episodeData.scheduled_at).toISOString()
+                    : null,
             };
             if (editingEpisodeId) {
                 await updateEpisode(editingEpisodeId, payload);
@@ -499,6 +555,7 @@ export default function AdminSeries() {
                 onAddEpisode={handleAddEpisode}
                 onEditEpisode={handleEditEpisode}
                 onDeleteEpisode={handleDeleteEpisode}
+                onDuplicateEpisode={handleDuplicateEpisode}
             />
 
             <DeleteConfirmModal

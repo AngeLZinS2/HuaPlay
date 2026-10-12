@@ -25,6 +25,8 @@ export default function SeriesDetailsModal() {
     // null whenever the link is missing or is not something we can embed, in
     // which case the header falls back to the banner still.
     const trailer = getTrailerEmbed(selectedSeries?.trailer_url);
+    const description = selectedSeries?.description?.trim() || 'Sinopse não disponível.';
+    const episodeDescription = description.length > 120 ? `${description.substring(0, 120)}...` : description;
 
     // Reset state when modal opens/closes or series changes
     useEffect(() => {
@@ -198,7 +200,7 @@ export default function SeriesDetailsModal() {
                                         <span className="border border-white/20 px-2 py-0.5 rounded text-xs text-gray-300">Legendado</span>
                                     </div>
                                     <p className="text-gray-300 text-base md:text-lg leading-relaxed font-light">
-                                        {selectedSeries.description}
+                                        {description}
                                     </p>
                                 </div>
                                 <div className="space-y-4 text-sm border-l border-white/10 pl-6 md:pl-8">
@@ -236,7 +238,10 @@ export default function SeriesDetailsModal() {
                                             </span>
                                             <div className="w-32 md:w-40 aspect-video bg-gray-900 rounded-sm overflow-hidden relative shadow-lg flex-shrink-0">
                                                 <img
-                                                    src={selectedSeries.banner || selectedSeries.image}
+                                                    src={getOptimizedImageUrl(
+                                                        selectedSeries.banner || selectedSeries.banner_image || selectedSeries.image || selectedSeries.cover_image,
+                                                        'thumbnail',
+                                                    )}
                                                     alt={ep.title}
                                                     className="w-full h-full object-cover opacity-60 group-hover:opacity-100 group-hover:scale-110 transition-all duration-700"
                                                 />
@@ -252,7 +257,7 @@ export default function SeriesDetailsModal() {
                                                     <span className="text-xs text-gray-500 font-mono hidden sm:block">45m</span>
                                                 </div>
                                                 <p className="text-gray-400 text-xs md:text-sm line-clamp-2 font-light">
-                                                    {selectedSeries.description.substring(0, 120)}...
+                                                    {episodeDescription}
                                                 </p>
                                             </div>
                                         </div>

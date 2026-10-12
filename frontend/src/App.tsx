@@ -12,6 +12,9 @@ import Profile from './pages/Profile';
 import AdminDashboard from './pages/AdminDashboard';
 import AdminSeries from './pages/AdminSeries';
 import AdminActors from './pages/AdminActors';
+import AdminHealth from './pages/AdminHealth';
+import AdminReports from './pages/AdminReports';
+import AdminHome from './pages/AdminHome';
 import SeriesDetail from './pages/SeriesDetail';
 import Actors from './pages/Actors';
 import ActorDetail from './pages/ActorDetail';
@@ -20,6 +23,13 @@ import Profiles from './pages/Profiles';
 import PageTransition from './components/PageTransition';
 import AdminLayout from './components/admin/AdminLayout';
 import RequireAdmin from './components/admin/RequireAdmin';
+import MobileBottomNav from './components/MobileBottomNav';
+import ShakeToReport from './components/ShakeToReport';
+import FAQ from './pages/FAQ';
+import Terms from './pages/Terms';
+import Privacy from './pages/Privacy';
+import Copyright from './pages/Copyright';
+import Contact from './pages/Contact';
 
 import CategoryExplore from './pages/CategoryExplore';
 
@@ -28,8 +38,10 @@ function PublicLayout({ children }: { children: React.ReactNode }) {
     <ModalProvider>
       <div className="min-h-screen flex flex-col font-sans bg-background text-white">
         <Navbar />
-        <main className="flex-grow">{children}</main>
+        <main className="flex-grow pb-28 md:pb-0">{children}</main>
         <Footer />
+        <MobileBottomNav />
+        <ShakeToReport />
         <SeriesDetailsModal />
       </div>
     </ModalProvider>
@@ -61,6 +73,9 @@ function App() {
               <Route path="/admin" element={<AdminDashboard />} />
               <Route path="/admin/series" element={<AdminSeries />} />
               <Route path="/admin/actors" element={<AdminActors />} />
+              <Route path="/admin/health" element={<AdminHealth />} />
+              <Route path="/admin/reports" element={<AdminReports />} />
+              <Route path="/admin/home" element={<AdminHome />} />
             </Routes>
           </AnimatePresence>
         </AdminLayout>
@@ -88,6 +103,11 @@ function App() {
           <Route path="/actors" element={<PageTransition><Actors gender="Male" title="Atores" /></PageTransition>} />
           <Route path="/actresses" element={<PageTransition><Actors gender="Female" title="Atrizes" /></PageTransition>} />
           <Route path="/actors/:id" element={<PageTransition><ActorDetail /></PageTransition>} />
+          <Route path="/faq" element={<PageTransition><FAQ /></PageTransition>} />
+          <Route path="/terms" element={<PageTransition><Terms /></PageTransition>} />
+          <Route path="/privacy" element={<PageTransition><Privacy /></PageTransition>} />
+          <Route path="/copyright" element={<PageTransition><Copyright /></PageTransition>} />
+          <Route path="/contact" element={<PageTransition><Contact /></PageTransition>} />
         </Routes>
       </AnimatePresence>
     </PublicLayout>

@@ -4,16 +4,16 @@ import type { ReactNode } from 'react';
 interface Series {
     id: number;
     title: string;
-    description: string;
+    description?: string | null;
     release_year: number;
-    cover_image?: string;
-    banner_image?: string;
-    image?: string; // fallback
-    banner?: string; // fallback
-    trailer_url?: string;
-    cast?: string;
-    genre?: string;
-    moods?: string;
+    cover_image?: string | null;
+    banner_image?: string | null;
+    image?: string | null; // fallback
+    banner?: string | null; // fallback
+    trailer_url?: string | null;
+    cast?: string | null;
+    genre?: string | null;
+    moods?: string | null;
     [key: string]: any;
 }
 
