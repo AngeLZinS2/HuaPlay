@@ -6,6 +6,7 @@ import api, { getPersonalizedRecommendations } from '../services/api';
 import { fetchMyListSeries } from '../services/library';
 import { getRecentlyWatched } from '../services/userData';
 import { useAuth } from '../context/AuthContext';
+import { useHomeInactivityRedirect } from '../hooks/useHomeInactivityRedirect';
 
 export default function Home() {
     const { uid, isAuthenticated, currentProfile, myListIds, myLikeIds } = useAuth();
@@ -20,6 +21,8 @@ export default function Home() {
     const [hasManagedHome, setHasManagedHome] = useState(false);
     const [loading, setLoading] = useState(true);
     const { openModal } = useModal();
+
+    useHomeInactivityRedirect(isAuthenticated && Boolean(currentProfile));
 
     const formatSeries = (items: any[]) => {
         return (items || []).map((item: any) => ({
