@@ -4,6 +4,8 @@ services:
     restart: unless-stopped
     environment:
       FIREBASE_PROJECT_ID: gtavi-6991d
+      GROQ_API_KEY: ${GROQ_API_KEY:-}
+      GROQ_MODEL: ${GROQ_MODEL:-llama-3.1-8b-instant}
     volumes:
       - ./data/weifansub.db:/app/weifansub.db
 

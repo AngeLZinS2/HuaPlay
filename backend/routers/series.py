@@ -1,4 +1,8 @@
 from typing import List
+from functools import lru_cache
+import os
+import re
+import requests
 from fastapi import APIRouter, Depends, HTTPException, status, Response
 from sqlalchemy.orm import Session
 from sqlalchemy import func
@@ -23,6 +27,55 @@ import time
 import recommender
 from typing import Optional
 from fastapi import Header
+
+HERO_SUMMARY_MAX_CHARS = 260
+
+
+def _local_hero_summary(description: str) -> str:
+    """Short, readable fallback that never cuts the Hero in the middle of a word."""
+    clean = re.sub(r"\s+", " ", description or "").strip()
+    if len(clean) <= HERO_SUMMARY_MAX_CHARS:
+        return clean
+    candidate = clean[:HERO_SUMMARY_MAX_CHARS + 1]
+    sentence_end = max(candidate.rfind(". "), candidate.rfind("! "), candidate.rfind("? "))
+    if sentence_end >= 120:
+        return candidate[:sentence_end + 1]
+    return candidate[:candidate.rfind(" ")].rstrip(" ,;:-") + "…"
+
+
+@lru_cache(maxsize=512)
+def _hero_summary(description: str) -> str:
+    """Generate once per synopsis/process; fall back locally if Groq is unavailable."""
+    fallback = _local_hero_summary(description)
+    api_key = os.getenv("GROQ_API_KEY", "").strip()
+    if not api_key or len(description or "") <= HERO_SUMMARY_MAX_CHARS:
+        return fallback
+    try:
+        response = requests.post(
+            "https://api.groq.com/openai/v1/chat/completions",
+            headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+            json={
+                "model": os.getenv("GROQ_MODEL", "llama-3.1-8b-instant"),
+                "temperature": 0.2,
+                "max_tokens": 110,
+                "messages": [
+                    {"role": "system", "content": "Resuma sinopses para um banner de streaming em português do Brasil. Use no máximo 260 caracteres, uma ou duas frases, preserve nomes e o conflito central, sem inventar fatos, sem título, aspas ou comentários."},
+                    {"role": "user", "content": description},
+                ],
+            },
+            timeout=8,
+        )
+        response.raise_for_status()
+        summary = re.sub(r"\s+", " ", response.json()["choices"][0]["message"]["content"]).strip().strip('"')
+        return _local_hero_summary(summary) if summary else fallback
+    except (requests.RequestException, KeyError, IndexError, TypeError, ValueError):
+        return fallback
+
+
+def _with_hero_summary(series: models.Series) -> models.Series:
+    if series.description:
+        series.description = _hero_summary(series.description)
+    return series
 
 def get_or_create_featured_config(db: Session) -> models.FeaturedConfig:
     config = db.query(models.FeaturedConfig).first()
@@ -64,11 +117,11 @@ def get_hero_featured(db: Session = Depends(get_db)):
         # First check if any series is explicitly starred (is_featured = True)
         starred = db.query(models.Series).filter(models.Series.is_featured == True).first()
         if starred:
-            return starred
+            return _with_hero_summary(starred)
         if config.manual_series_id:
             series = db.query(models.Series).filter(models.Series.id == config.manual_series_id).first()
             if series:
-                return series
+                return _with_hero_summary(series)
 
     # 2. MOST_WATCHED MODE
     if config.mode == "MOST_WATCHED":
@@ -79,7 +132,7 @@ def get_hero_featured(db: Session = Depends(get_db)):
             .first()
         )
         if most_watched:
-            return most_watched
+            return _with_hero_summary(most_watched)
 
     # 3. RANDOM_ROTATE MODE (or fallback)
     pool = (
@@ -94,7 +147,7 @@ def get_hero_featured(db: Session = Depends(get_db)):
     if pool:
         interval_seconds = max(60, config.rotate_interval_minutes * 60)
         time_slot = (int(time.time()) // interval_seconds) % len(pool)
-        return pool[time_slot]
+        return _with_hero_summary(pool[time_slot])
 
     raise HTTPException(status_code=404, detail="No series available for hero featured")
 
