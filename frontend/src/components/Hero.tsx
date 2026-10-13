@@ -132,10 +132,10 @@ export default function Hero() {
                         {/* Mobile: Show Image Fallback */}
                         <div className="block md:hidden w-full h-full relative bg-neutral-950">
                             <img
-                                src={getOptimizedImageUrl(featured.banner_image || featured.cover_image, 'backdrop')}
+                                src={getOptimizedImageUrl(featured.cover_image || featured.banner_image, 'poster')}
                                 alt={featured.title}
                                 decoding="async"
-                                className="w-full h-full object-cover"
+                                className="h-full w-full object-cover object-top"
                             />
                         </div>
 
@@ -154,12 +154,18 @@ export default function Hero() {
                         </div>
                     </>
                 ) : (
-                    <img
-                        src={getOptimizedImageUrl(featured.banner_image || featured.cover_image, 'backdrop')}
-                        alt={featured.title}
-                        decoding="async"
-                        className="w-full h-full object-cover"
-                    />
+                    <picture>
+                        <source
+                            media="(max-width: 767px)"
+                            srcSet={getOptimizedImageUrl(featured.cover_image || featured.banner_image, 'poster')}
+                        />
+                        <img
+                            src={getOptimizedImageUrl(featured.banner_image || featured.cover_image, 'backdrop')}
+                            alt={featured.title}
+                            decoding="async"
+                            className="h-full w-full object-cover object-top md:object-center"
+                        />
+                    </picture>
                 )}
                 {/* Cinematic Gradient Overlays */}
                 <div className="absolute inset-0 bg-black/30" />
