@@ -63,7 +63,10 @@ export default function Profile() {
     const displayEmail = user?.email;
 
     return (
-        <div className="min-h-screen pb-20 pt-24 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
+        <div
+            className="min-h-screen pb-20 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto"
+            style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 5rem)' }}
+        >
             {/* Profile Header */}
             <div className="flex flex-col md:flex-row items-center gap-8 mb-12">
                 <div className="relative group">

@@ -72,22 +72,22 @@ export default function Navbar() {
 
     return (
         <nav
-            className={`fixed top-0 w-full z-50 transition-colors duration-300 ${isScrolled ? 'bg-background/95 backdrop-blur-sm shadow-md' : 'bg-transparent'
+            style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}
+            className={`fixed top-0 w-full z-50 transition-colors duration-300 ${isScrolled ? 'bg-background/95 backdrop-blur-sm shadow-md' : 'bg-gradient-to-b from-black/85 via-black/40 to-transparent'
                 }`}
         >
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                <div className="flex items-center justify-between h-20"> {/* Increased height slightly for better spacing */}
-                    {/* Logo (Hidden on Desktop if centered, or kept left. User provided image shows logo separate or possibly centered. Keeping simplified text logo for now) */}
-                    {/* Assuming existing logo logic. Reference image doesn't show logo, just menu. keeping logo for functionality */}
-                    <Link to="/" className="flex items-center gap-3 group mr-8">
+                <div className="flex items-center justify-between h-14 md:h-20"> {/* Responsive height: compact on mobile, spacious on desktop */}
+                    {/* Logo */}
+                    <Link to="/" className="flex items-center gap-2 md:gap-3 group mr-4 md:mr-8">
                         <img
                             src="/Logo Wei.png"
                             alt="HuaPlay"
-                            className="h-10 w-auto object-contain rounded-full shadow-lg group-hover:scale-105 transition-transform duration-300"
+                            className="h-8 md:h-10 w-auto object-contain rounded-full shadow-lg group-hover:scale-105 transition-transform duration-300"
                         />
                         <div className="flex items-center">
-                            <span className="text-lg md:text-xl lg:text-2xl font-display font-bold text-primary tracking-wider">Hua</span>
-                            <span className="text-lg md:text-xl lg:text-2xl font-display font-bold text-white tracking-widest ml-1">Play</span>
+                            <span className="text-base sm:text-lg md:text-xl lg:text-2xl font-display font-bold text-primary tracking-wider">Hua</span>
+                            <span className="text-base sm:text-lg md:text-xl lg:text-2xl font-display font-bold text-white tracking-widest ml-1">Play</span>
                         </div>
                     </Link>
 
@@ -243,10 +243,11 @@ export default function Navbar() {
                     </div>
 
                     {/* Mobile Icons & Menu */}
-                    <div className="md:hidden flex items-center gap-4">
+                    <div className="md:hidden flex items-center gap-2.5 sm:gap-3">
                         <button
-                            className="text-gray-300 hover:text-white transition-colors"
+                            className="p-1.5 text-gray-300 hover:text-white transition-colors"
                             onClick={() => setIsSearchOpen(true)}
+                            aria-label="Buscar"
                         >
                             <Search className="w-5 h-5" />
                         </button>
@@ -255,9 +256,10 @@ export default function Navbar() {
                             <div className="relative z-50">
                                 <button
                                     onClick={() => setActiveDropdown(activeDropdown === 'mobile-profile' ? null : 'mobile-profile')}
-                                    className="flex items-center gap-2"
+                                    className="flex items-center gap-1.5 p-1"
+                                    aria-label="Perfil"
                                 >
-                                    <div className={`w-8 h-8 rounded-md overflow-hidden border transition-colors ${activeDropdown === 'mobile-profile' ? 'border-white' : 'border-transparent'}`}>
+                                    <div className={`w-7 h-7 rounded-md overflow-hidden border transition-colors ${activeDropdown === 'mobile-profile' ? 'border-white' : 'border-transparent'}`}>
                                         <img
                                             src={currentProfile?.avatarUrl || "https://wallpapers.com/images/hd/netflix-profile-pictures-1000-x-1000-qo9h82134t9nv0j0.jpg"}
                                             alt="Profile"
@@ -316,8 +318,8 @@ export default function Navbar() {
                                 </AnimatePresence>
                             </div>
                         ) : (
-                            <Link to="/login" className="text-gray-300 hover:text-white">
-                                <User className="w-6 h-6" />
+                            <Link to="/login" className="p-1.5 text-gray-300 hover:text-white" aria-label="Login">
+                                <User className="w-5 h-5" />
                             </Link>
                         )}
 
@@ -325,9 +327,9 @@ export default function Navbar() {
                             onClick={() => setIsMobileMenuOpen(true)}
                             aria-label="Abrir menu"
                             aria-expanded={isMobileMenuOpen}
-                            className="text-gray-300 hover:text-white"
+                            className="p-1.5 text-gray-300 hover:text-white"
                         >
-                            <Menu />
+                            <Menu className="w-6 h-6" />
                         </button>
                     </div>
                 </div>
@@ -342,16 +344,17 @@ export default function Navbar() {
                         exit={{ opacity: 0, x: '100%' }}
                         transition={{ type: 'spring', damping: 25, stiffness: 200 }}
                         className="fixed inset-0 z-[60] md:hidden bg-black/95 backdrop-blur-xl h-[100dvh] overflow-y-auto"
+                        style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}
                     >
-                        <div className="flex flex-col pt-6 px-6 space-y-6 pb-32">
-                            <div className="flex justify-between items-center mb-8 h-14">
+                        <div className="flex flex-col pt-4 px-6 space-y-6 pb-32">
+                            <div className="flex justify-between items-center mb-6 h-12">
                                 <span className="text-xl font-display font-bold text-primary">MENU</span>
                                 <button
                                     onClick={() => setIsMobileMenuOpen(false)}
                                     aria-label="Fechar menu"
                                     className="p-2 border border-white/20 rounded-full text-white hover:bg-white/10 transition-colors"
                                 >
-                                    <X className="w-6 h-6" />
+                                    <X className="w-5 h-5" />
                                 </button>
                             </div>
                             {navigation.map((item, idx) => (

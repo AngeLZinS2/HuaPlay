@@ -145,7 +145,10 @@ export default function Hero() {
     return (
         <>
             {/* Mobile Hero: Netflix-style Floating Poster Card */}
-            <div className="block md:hidden w-full px-3.5 pt-20 pb-3">
+            <div
+                className="block md:hidden w-full px-3.5 pb-3"
+                style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 4.25rem)' }}
+            >
                 <motion.div
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
