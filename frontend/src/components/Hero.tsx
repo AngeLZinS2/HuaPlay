@@ -123,24 +123,109 @@ export default function Hero() {
         trailer && (featured.feature_type === 'TRAILER' || !featured.feature_type),
     );
 
+    const typeLabel = featured.type === 'Movie'
+        ? 'Filme'
+        : featured.type === 'Anime'
+        ? 'Anime'
+        : featured.type === 'Donghua'
+        ? 'Donghua'
+        : 'Série';
+
+    const genreList = featured.genre
+        ? featured.genre
+              .split(/[,/]+/)
+              .map((g: string) => g.trim())
+              .filter((g: string) => Boolean(g) && g.toLowerCase() !== typeLabel.toLowerCase())
+              .slice(0, 3)
+        : ['Romance', 'Drama'];
+
+    const mobileTags = [typeLabel, ...genreList];
+    const mobilePlayLabel = featured.type === 'Movie' ? 'Assistir ao filme' : 'Assistir à série';
+
     return (
-        <div className="relative h-screen w-full overflow-hidden">
-            {/* Background Video/Image */}
-            <div className="absolute inset-0 select-none pointer-events-none">
-                {showsTrailer ? (
-                    <>
-                        {/* Mobile: Show Image Fallback */}
-                        <div className="block md:hidden w-full h-full relative bg-neutral-950">
-                            <img
-                                src={getOptimizedImageUrl(featured.cover_image || featured.banner_image, 'poster')}
-                                alt={featured.title}
-                                decoding="async"
-                                className="h-full w-full object-cover object-top"
-                            />
+        <>
+            {/* Mobile Hero: Netflix-style Floating Poster Card */}
+            <div className="block md:hidden w-full px-3.5 pt-20 pb-3">
+                <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.6, ease: 'easeOut' }}
+                    className="relative w-full h-[70vh] min-h-[480px] max-h-[580px] rounded-2xl overflow-hidden border border-white/15 shadow-[0_12px_40px_rgba(0,0,0,0.85)] bg-neutral-950 flex flex-col justify-end"
+                >
+                    {/* Poster Image */}
+                    <img
+                        src={getOptimizedImageUrl(featured.cover_image || featured.banner_image, 'poster')}
+                        alt={featured.title}
+                        decoding="async"
+                        className="absolute inset-0 w-full h-full object-cover object-top select-none pointer-events-none"
+                    />
+
+                    {/* Top Subtle Vignette */}
+                    <div className="absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-black/60 via-black/20 to-transparent pointer-events-none" />
+
+                    {/* Bottom Rich Gradient for maximum text and button readability */}
+                    <div className="absolute inset-x-0 bottom-0 h-3/5 bg-gradient-to-t from-black via-black/80 via-45% to-transparent pointer-events-none" />
+
+                    {/* Floating Content inside the card */}
+                    <div className="relative z-10 px-4 pb-4 pt-6 flex flex-col items-center text-center">
+                        {/* Title */}
+                        <h1 className="text-2xl sm:text-3xl font-display font-bold text-white tracking-wide drop-shadow-[0_2px_10px_rgba(0,0,0,0.9)] line-clamp-2 leading-tight max-w-[92%]">
+                            {featured.title}
+                        </h1>
+
+                        {/* Minimal Genres/Tags: single line separated by dots */}
+                        <div className="flex items-center justify-center flex-wrap gap-x-2 gap-y-1 text-xs text-gray-200 font-medium tracking-wide mt-2 mb-4 drop-shadow">
+                            {mobileTags.map((tag, idx) => (
+                                <span key={idx} className="flex items-center gap-2">
+                                    <span>{tag}</span>
+                                    {idx < mobileTags.length - 1 && (
+                                        <span className="text-gray-400 text-[10px] select-none">•</span>
+                                    )}
+                                </span>
+                            ))}
                         </div>
 
-                        {/* Desktop: Show Trailer */}
-                        <div className="hidden md:block relative w-full h-full overflow-hidden">
+                        {/* Action Buttons: Netflix style stacked */}
+                        <div className="w-full flex flex-col gap-2.5">
+                            {/* Primary Button: Solid White */}
+                            <motion.button
+                                whileTap={{ scale: 0.98 }}
+                                onClick={() => navigate(`/series/${featured.slug || featured.id}`)}
+                                className="w-full py-2.5 px-4 bg-white hover:bg-neutral-200 active:bg-neutral-300 text-black font-semibold text-sm rounded-md flex items-center justify-center gap-2 transition-all shadow-md"
+                            >
+                                <Play className="w-4 h-4 fill-black text-black" />
+                                <span>{mobilePlayLabel}</span>
+                            </motion.button>
+
+                            {/* Secondary Button: Frosted Dark */}
+                            <motion.button
+                                whileTap={{ scale: 0.98 }}
+                                onClick={handleToggleList}
+                                className="w-full py-2.5 px-4 bg-[#262626]/85 hover:bg-[#333333] active:bg-[#404040] text-white font-medium text-sm rounded-md flex items-center justify-center gap-2 border border-white/10 backdrop-blur-md transition-all"
+                            >
+                                {isInList ? (
+                                    <>
+                                        <Check className="w-4 h-4 text-white" />
+                                        <span>Minha lista</span>
+                                    </>
+                                ) : (
+                                    <>
+                                        <Plus className="w-4 h-4 text-white" />
+                                        <span>Minha lista</span>
+                                    </>
+                                )}
+                            </motion.button>
+                        </div>
+                    </div>
+                </motion.div>
+            </div>
+
+            {/* Desktop Hero: Wide Cinematic Banner */}
+            <div className="hidden md:block relative h-screen w-full overflow-hidden">
+                {/* Background Video/Image */}
+                <div className="absolute inset-0 select-none pointer-events-none">
+                    {showsTrailer ? (
+                        <div className="relative w-full h-full overflow-hidden">
                             <iframe
                                 ref={iframeRef}
                                 src={trailer?.src}
@@ -152,101 +237,92 @@ export default function Hero() {
                                 referrerPolicy="strict-origin-when-cross-origin"
                             />
                         </div>
-                    </>
-                ) : (
-                    <picture>
-                        <source
-                            media="(max-width: 767px)"
-                            srcSet={getOptimizedImageUrl(featured.cover_image || featured.banner_image, 'poster')}
-                        />
+                    ) : (
                         <img
                             src={getOptimizedImageUrl(featured.banner_image || featured.cover_image, 'backdrop')}
                             alt={featured.title}
                             decoding="async"
-                            className="h-full w-full object-cover object-top md:object-center"
+                            className="w-full h-full object-cover"
                         />
-                    </picture>
-                )}
-                {/* Cinematic Gradient Overlays */}
-                <div className="absolute inset-0 bg-black/30" />
-                <div className="absolute inset-0 bg-gradient-to-t from-[#050505] via-transparent to-transparent" />
-                <div className="absolute inset-0 bg-gradient-to-r from-[#050505] via-[#050505]/40 to-transparent" />
-                <div className="absolute bottom-0 w-full h-32 bg-gradient-to-t from-[#050505] to-transparent" />
-            </div>
+                    )}
+                    {/* Cinematic Gradient Overlays */}
+                    <div className="absolute inset-0 bg-black/30" />
+                    <div className="absolute inset-0 bg-gradient-to-t from-[#050505] via-transparent to-transparent" />
+                    <div className="absolute inset-0 bg-gradient-to-r from-[#050505] via-[#050505]/40 to-transparent" />
+                    <div className="absolute bottom-0 w-full h-32 bg-gradient-to-t from-[#050505] to-transparent" />
+                </div>
 
-            {/* Content */}
-            <div className="relative h-full w-full px-6 md:px-12 lg:px-20 flex items-center pt-16 md:pt-20 lg:pt-24 pb-12">
-                <motion.div
-                    initial={{ opacity: 0, y: 50 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.8, delay: 0.2 }}
-                    className="max-w-4xl space-y-4 md:space-y-6 lg:space-y-8"
-                >
+                {/* Content */}
+                <div className="relative h-full w-full px-6 md:px-12 lg:px-20 flex items-center pt-16 md:pt-20 lg:pt-24 pb-12">
                     <motion.div
-                        initial={{ opacity: 0, x: -20 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ delay: 0.5 }}
-                        className="flex items-center gap-3 mb-4"
+                        initial={{ opacity: 0, y: 50 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.8, delay: 0.2 }}
+                        className="max-w-4xl space-y-4 md:space-y-6 lg:space-y-8"
                     >
-                        <div className="h-[2px] w-8 md:w-12 bg-primary"></div>
-                        <span className="text-primary font-display font-bold tracking-[0.2em] text-xs md:text-sm uppercase glow-text">
-                            Destaque Semanal
-                        </span>
+                        <motion.div
+                            initial={{ opacity: 0, x: -20 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            transition={{ delay: 0.5 }}
+                            className="flex items-center gap-3 mb-4"
+                        >
+                            <div className="h-[2px] w-8 md:w-12 bg-primary"></div>
+                            <span className="text-primary font-display font-bold tracking-[0.2em] text-xs md:text-sm uppercase glow-text">
+                                Destaque Semanal
+                            </span>
+                        </motion.div>
+
+                        <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl xl:text-7xl font-display font-bold leading-none text-transparent bg-clip-text bg-gradient-to-b from-white to-gray-400 drop-shadow-2xl max-w-4xl">
+                            {featured.title}
+                        </h1>
+
+                        <div className="flex items-center gap-3 md:gap-6 text-gray-200 font-sans text-sm md:text-lg tracking-wide border-l-2 border-primary pl-4">
+                            <span className="text-primary font-bold">98% Match</span>
+                            <span>{featured.release_year}</span>
+                            <span className="px-2 py-0.5 border border-white/20 rounded text-xs bg-black/40 backdrop-blur-sm">{featured.status}</span>
+                            <span className="px-2 py-0.5 border border-white/20 rounded text-xs bg-black/40 backdrop-blur-sm">HD</span>
+                        </div>
+
+                        <p className="text-gray-300 text-sm md:text-lg max-w-xl md:max-w-2xl line-clamp-3 font-light leading-relaxed drop-shadow-md">
+                            {featured.description || "Uma história envolvente que vai prender sua atenção do início ao fim. Descubra os segredos e emoções desta incrível produção asiática."}
+                        </p>
+
+                        <div className="flex flex-wrap items-center gap-4 pt-4 md:pt-6">
+                            <motion.button
+                                whileHover={{ scale: 1.05, textShadow: "0 0 8px rgba(212, 175, 55, 0.5)" }}
+                                whileTap={{ scale: 0.95 }}
+                                onClick={() => navigate(`/series/${featured.slug || featured.id}`)}
+                                className="group flex items-center gap-2 md:gap-3 px-6 py-3 md:px-10 md:py-4 bg-gradient-to-r from-primary to-[#b8860b] text-black rounded-sm font-display font-bold text-base md:text-xl hover:brightness-110 transition-all shadow-[0_0_20px_rgba(212,175,55,0.3)] w-full md:w-auto justify-center"
+                            >
+                                <Play className="w-5 h-5 md:w-6 md:h-6 fill-black group-hover:fill-current transition-colors" />
+                                ASSISTIR AGORA
+                            </motion.button>
+
+                            <motion.button
+                                whileHover={{ scale: 1.05, borderColor: "#D4AF37", color: "#D4AF37" }}
+                                whileTap={{ scale: 0.95 }}
+                                onClick={handleToggleList}
+                                className={`flex items-center gap-2 md:gap-3 px-6 py-3 md:px-8 md:py-4 border border-white/30 backdrop-blur-md rounded-sm font-display font-bold text-base md:text-xl transition-all hover:bg-black/60 w-full md:w-auto justify-center ${isInList ? 'bg-primary/20 text-primary border-primary' : 'bg-black/40 text-white'}`}
+                            >
+                                {isInList ? <Check className="w-5 h-5 md:w-6 md:h-6" /> : <Plus className="w-5 h-5 md:w-6 md:h-6" />}
+                                {isInList ? 'NA LISTA' : 'MINHA LISTA'}
+                            </motion.button>
+                        </div>
                     </motion.div>
+                </div>
 
-                    <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl xl:text-7xl font-display font-bold leading-none text-transparent bg-clip-text bg-gradient-to-b from-white to-gray-400 drop-shadow-2xl max-w-4xl">
-                        {featured.title}
-                    </h1>
-
-                    <div className="flex items-center gap-3 md:gap-6 text-gray-200 font-sans text-sm md:text-lg tracking-wide border-l-2 border-primary pl-4">
-                        <span className="text-primary font-bold">98% Match</span>
-                        <span>{featured.release_year}</span>
-                        <span className="px-2 py-0.5 border border-white/20 rounded text-xs bg-black/40 backdrop-blur-sm">{featured.status}</span>
-                        <span className="px-2 py-0.5 border border-white/20 rounded text-xs bg-black/40 backdrop-blur-sm">HD</span>
-                    </div>
-
-                    <p className="text-gray-300 text-sm md:text-lg max-w-xl md:max-w-2xl line-clamp-3 font-light leading-relaxed drop-shadow-md">
-                        {featured.description || "Uma história envolvente que vai prender sua atenção do início ao fim. Descubra os segredos e emoções desta incrível produção asiática."}
-                    </p>
-
-                    <div className="flex flex-wrap items-center gap-4 pt-4 md:pt-6">
-                        <motion.button
-                            whileHover={{ scale: 1.05, textShadow: "0 0 8px rgba(212, 175, 55, 0.5)" }}
-                            whileTap={{ scale: 0.95 }}
-                            onClick={() => navigate(`/series/${featured.slug || featured.id}`)}
-                            className="group flex items-center gap-2 md:gap-3 px-6 py-3 md:px-10 md:py-4 bg-gradient-to-r from-primary to-[#b8860b] text-black rounded-sm font-display font-bold text-base md:text-xl hover:brightness-110 transition-all shadow-[0_0_20px_rgba(212,175,55,0.3)] w-full md:w-auto justify-center"
-                        >
-                            <Play className="w-5 h-5 md:w-6 md:h-6 fill-black group-hover:fill-current transition-colors" />
-                            ASSISTIR AGORA
-                        </motion.button>
-
-                        <motion.button
-                            whileHover={{ scale: 1.05, borderColor: "#D4AF37", color: "#D4AF37" }}
-                            whileTap={{ scale: 0.95 }}
-                            onClick={handleToggleList}
-                            className={`flex items-center gap-2 md:gap-3 px-6 py-3 md:px-8 md:py-4 border border-white/30 backdrop-blur-md rounded-sm font-display font-bold text-base md:text-xl transition-all hover:bg-black/60 w-full md:w-auto justify-center ${isInList ? 'bg-primary/20 text-primary border-primary' : 'bg-black/40 text-white'}`}
-                        >
-                            {isInList ? <Check className="w-5 h-5 md:w-6 md:h-6" /> : <Plus className="w-5 h-5 md:w-6 md:h-6" />}
-                            {isInList ? 'NA LISTA' : 'MINHA LISTA'}
-                        </motion.button>
-
-                    </div>
-                </motion.div>
+                {/* Mute toggle for Desktop Trailer */}
+                {showsTrailer && trailer?.supportsMuteApi && (
+                    <button
+                        onClick={() => setIsMuted(!isMuted)}
+                        aria-label={isMuted ? 'Ativar som do trailer' : 'Silenciar trailer'}
+                        title={isMuted ? 'Ativar som' : 'Silenciar'}
+                        className="hidden md:flex absolute bottom-28 right-6 md:right-12 lg:right-20 z-20 items-center justify-center p-4 border border-white/10 rounded-full text-gray-400 hover:text-primary hover:border-primary/50 bg-black/60 backdrop-blur-md transition-all"
+                    >
+                        {isMuted ? <VolumeX className="w-6 h-6" /> : <Volume2 className="w-6 h-6" />}
+                    </button>
+                )}
             </div>
-
-            {/* Mute toggle. Anchored to the hero itself rather than the text
-                column, and only rendered while the trailer is on screen — the
-                trailer is desktop-only, so the control is too. */}
-            {showsTrailer && trailer?.supportsMuteApi && (
-                <button
-                    onClick={() => setIsMuted(!isMuted)}
-                    aria-label={isMuted ? 'Ativar som do trailer' : 'Silenciar trailer'}
-                    title={isMuted ? 'Ativar som' : 'Silenciar'}
-                    className="hidden md:flex absolute bottom-28 right-6 md:right-12 lg:right-20 z-20 items-center justify-center p-4 border border-white/10 rounded-full text-gray-400 hover:text-primary hover:border-primary/50 bg-black/60 backdrop-blur-md transition-all"
-                >
-                    {isMuted ? <VolumeX className="w-6 h-6" /> : <Volume2 className="w-6 h-6" />}
-                </button>
-            )}
-        </div>
+        </>
     );
 }

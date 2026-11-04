@@ -152,7 +152,7 @@ export default function Home() {
         <div className="min-h-screen pb-20 overflow-x-hidden">
             <Hero />
 
-            <div className="relative z-10 -mt-12 space-y-12">
+            <div className="relative z-10 mt-2 md:-mt-12 space-y-8 md:space-y-12">
                 {/* 0. Minha Lista (Exibido apenas se o usuário estiver logado e possuir conteúdos salvos) */}
                 {isAuthenticated && myListRow.length > 0 && (
                     <SeriesRow
