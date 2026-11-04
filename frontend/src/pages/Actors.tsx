@@ -29,10 +29,7 @@ export default function Actors({ gender, title }: { gender?: string, title?: str
         <div className="min-h-screen bg-[#0a0a0a] text-white font-sans">
             <Navbar />
 
-            <main
-                className="pb-16 px-4 md:px-8 max-w-7xl mx-auto"
-                style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 5rem)' }}
-            >
+            <main className="pt-24 pb-16 px-4 md:px-8 max-w-7xl mx-auto">
                 <div className="text-center mb-12">
                     <h1 className="text-4xl md:text-5xl font-cursive text-white mb-2" style={{ fontFamily: 'Great Vibes, cursive' }}>{title || 'Atores'}</h1>
                     <div className="w-full h-px bg-gradient-to-r from-transparent via-gray-700 to-transparent max-w-md mx-auto"></div>

@@ -75,8 +75,7 @@ export default function SearchModal({ isOpen, onClose }: SearchModalProps) {
                         animate={{ opacity: 1, scale: 1, y: 0 }}
                         exit={{ opacity: 0, scale: 0.95, y: -20 }}
                         transition={{ duration: 0.2 }}
-                        className="fixed inset-0 z-[60] flex items-start justify-center px-4 sm:px-6 pointer-events-none"
-                        style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 3.5rem)' }}
+                        className="fixed inset-0 z-[60] flex items-start justify-center pt-24 px-4 sm:px-6 pointer-events-none"
                     >
                         <div className="w-full max-w-3xl bg-surface/90 border border-white/10 rounded-2xl shadow-2xl overflow-hidden pointer-events-auto flex flex-col max-h-[80vh]">
                             {/* Header / Input */}

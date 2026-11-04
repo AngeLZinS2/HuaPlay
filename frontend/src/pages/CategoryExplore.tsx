@@ -191,10 +191,7 @@ export default function CategoryExplore() {
     };
 
     return (
-        <div
-            className="min-h-screen bg-background pb-20 text-white"
-            style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 5rem)' }}
-        >
+        <div className="min-h-screen bg-background pt-24 pb-20 text-white">
             {/* Header Hero Banner */}
             <div className="relative overflow-hidden border-b border-white/10 bg-gradient-to-b from-primary/10 via-background to-background py-12 px-4 sm:px-6 lg:px-8">
                 <div className="max-w-7xl mx-auto">

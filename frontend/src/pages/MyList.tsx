@@ -54,10 +54,7 @@ export default function MyList() {
 
     return (
         <div className="min-h-screen bg-[#141414] text-white overflow-x-hidden">
-            <div
-                className="px-4 pb-12 sm:px-6 md:px-12"
-                style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 5rem)' }}
-            >
+            <div className="px-4 pb-12 pt-24 sm:px-6 md:px-12">
                 <h1 className="text-3xl font-bold mb-8">Minha Conta</h1>
 
                 {/* Tabs */}
