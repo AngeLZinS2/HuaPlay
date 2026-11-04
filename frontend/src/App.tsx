@@ -38,7 +38,7 @@ function PublicLayout({ children }: { children: React.ReactNode }) {
     <ModalProvider>
       <div className="min-h-screen flex flex-col font-sans bg-background text-white">
         <Navbar />
-        <main className="flex-grow pb-28 md:pb-0">{children}</main>
+        <main className="flex-grow">{children}</main>
         <Footer />
         <MobileBottomNav />
         <ShakeToReport />

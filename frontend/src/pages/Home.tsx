@@ -149,7 +149,7 @@ export default function Home() {
     }
 
     return (
-        <div className="min-h-screen pb-20 overflow-x-hidden">
+        <div className="min-h-screen pb-2 md:pb-20 overflow-x-hidden">
             <Hero />
 
             <div className="relative z-10 mt-2 md:-mt-12 space-y-8 md:space-y-12">

@@ -25,7 +25,7 @@ export default function SeriesRow({ title, series, onOpenModal }: SeriesRowProps
     };
 
     return (
-        <div className="space-y-2 md:space-y-4 mb-8 group px-4 sm:px-6 lg:px-8">
+        <div className="space-y-2 md:space-y-4 mb-3 md:mb-8 group px-4 sm:px-6 lg:px-8">
             <h2 className="text-lg md:text-xl font-semibold text-white transition-colors group-hover:text-primary">
                 {title}
             </h2>
@@ -40,7 +40,7 @@ export default function SeriesRow({ title, series, onOpenModal }: SeriesRowProps
 
                 <div
                     ref={rowRef}
-                    className="flex items-center space-x-2.5 overflow-x-scroll scrollbar-hide md:space-x-3.5 pb-10 pt-8 md:pb-20 md:pt-16 pl-4"
+                    className="flex items-center space-x-2.5 overflow-x-scroll scrollbar-hide md:space-x-3.5 py-2 md:pb-20 md:pt-16 pl-4"
                     style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
                 >
                     {series.map((item, index) => (

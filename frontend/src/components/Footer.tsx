@@ -5,7 +5,7 @@ const linkClass = 'text-sm text-gray-400 transition-colors hover:text-primary';
 
 export default function Footer() {
     return (
-        <footer className="mt-20 border-t border-white/10 bg-surface pb-28 pt-12 md:pb-8">
+        <footer className="mt-6 md:mt-20 border-t border-white/10 bg-surface pb-32 pt-8 md:pb-8 md:pt-12">
             <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
                 <div className="grid grid-cols-1 gap-10 sm:grid-cols-2 lg:grid-cols-4">
                     <div>
