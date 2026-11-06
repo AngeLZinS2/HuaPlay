@@ -1,0 +1,11 @@
+services:
+  backend:
+    working_dir: /data
+    environment:
+      PYTHONPATH: /app
+    volumes: !override
+      - type: bind
+        source: ./data
+        target: /data
+        bind:
+          create_host_path: false
