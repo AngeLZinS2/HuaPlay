@@ -1,5 +1,8 @@
 services:
   backend:
+    env_file:
+      - path: ${HUAPLAY_MAINTENANCE_ENV_FILE:-/home/deploy/.config/huaplay/maintenance.env}
+        required: false
     environment:
       FIREBASE_SERVICE_ACCOUNT_PATH: /run/secrets/huaplay-fcm.json
     volumes:
