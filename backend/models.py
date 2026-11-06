@@ -217,3 +217,97 @@ class HomeSection(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
+
+class HeroSlide(Base):
+    __tablename__ = "hero_slides"
+
+    id = Column(Integer, primary_key=True, index=True)
+    series_id = Column(Integer, ForeignKey("series.id", ondelete="SET NULL"), nullable=True)
+    title = Column(String, nullable=True)
+    subtitle = Column(String, nullable=True)
+    image_url = Column(String, nullable=False)
+    action_url = Column(String, nullable=True)
+    position = Column(Integer, nullable=False, default=0)
+    duration_seconds = Column(Integer, nullable=False, default=8)
+    is_active = Column(Boolean, nullable=False, default=True)
+    starts_at = Column(DateTime(timezone=True), nullable=True)
+    ends_at = Column(DateTime(timezone=True), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+
+class AdminNotification(Base):
+    __tablename__ = "admin_notifications"
+
+    id = Column(Integer, primary_key=True, index=True)
+    title = Column(String, nullable=False)
+    message = Column(Text, nullable=False)
+    image_url = Column(String, nullable=True)
+    action_url = Column(String, nullable=True)
+    audience = Column(String, nullable=False, default="all")
+    status = Column(String, nullable=False, default="draft")
+    scheduled_at = Column(DateTime(timezone=True), nullable=True)
+    sent_at = Column(DateTime(timezone=True), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+
+class SearchEvent(Base):
+    __tablename__ = "search_events"
+
+    id = Column(Integer, primary_key=True, index=True)
+    query = Column(String, nullable=False, index=True)
+    result_count = Column(Integer, nullable=False, default=0)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+
+class AdminAuditLog(Base):
+    __tablename__ = "admin_audit_logs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    action = Column(String, nullable=False, index=True)
+    entity_type = Column(String, nullable=False, index=True)
+    entity_id = Column(Integer, nullable=True)
+    payload = Column(Text, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+
+class TrashItem(Base):
+    __tablename__ = "trash_items"
+
+    id = Column(Integer, primary_key=True, index=True)
+    entity_type = Column(String, nullable=False, index=True)
+    entity_id = Column(Integer, nullable=True)
+    label = Column(String, nullable=True)
+    payload = Column(Text, nullable=False)
+    deleted_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    restored_at = Column(DateTime(timezone=True), nullable=True)
+
+
+class HomeLayoutVersion(Base):
+    __tablename__ = "home_layout_versions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    status = Column(String, nullable=False, default="draft", index=True)
+    payload = Column(Text, nullable=False, default="[]")
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    published_at = Column(DateTime(timezone=True), nullable=True)
+
+
+class ScheduledRelease(Base):
+    __tablename__ = "scheduled_releases"
+
+    id = Column(Integer, primary_key=True, index=True)
+    resource_type = Column(String, nullable=False, default="series")
+    resource_id = Column(Integer, nullable=False)
+    title = Column(String, nullable=False)
+    scheduled_at = Column(DateTime(timezone=True), nullable=False, index=True)
+    status = Column(String, nullable=False, default="scheduled")
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+
+class CatalogGenre(Base):
+    __tablename__ = "catalog_genres"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, nullable=False, unique=True, index=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+

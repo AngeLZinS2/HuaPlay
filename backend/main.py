@@ -4,7 +4,7 @@ from sqlalchemy import inspect, text
 
 from auth import FirebaseUser, get_current_admin, get_current_user
 from database import Base, engine
-from routers import actors, series, admin
+from routers import actors, series, admin, admin_suite
 
 # Create tables
 Base.metadata.create_all(bind=engine)
@@ -57,12 +57,14 @@ app.add_middleware(
 app.include_router(series.router)
 app.include_router(actors.router)
 app.include_router(admin.public_router)
+app.include_router(admin_suite.public_router)
 
 # Content writes. The guard lives on the include, not on each route, so a new
 # endpoint added to an admin_router cannot ship unprotected by accident.
 app.include_router(series.admin_router, dependencies=[Depends(get_current_admin)])
 app.include_router(actors.admin_router, dependencies=[Depends(get_current_admin)])
 app.include_router(admin.admin_router, dependencies=[Depends(get_current_admin)])
+app.include_router(admin_suite.admin_router, dependencies=[Depends(get_current_admin)])
 
 
 @app.get("/")

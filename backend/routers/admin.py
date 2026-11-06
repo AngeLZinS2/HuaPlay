@@ -1,5 +1,6 @@
 from datetime import datetime, time, timedelta, timezone
 from typing import Literal, Optional
+import random
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import func, or_
@@ -11,6 +12,188 @@ from database import get_db
 
 public_router = APIRouter(tags=["reports"])
 admin_router = APIRouter(prefix="/admin", tags=["admin"])
+
+COUNTRY_ALIASES = {
+    "coreia": "South Korea",
+    "coreia do sul": "South Korea",
+    "korea": "South Korea",
+    "south korea": "South Korea",
+    "tailândia": "Thailand",
+    "tailandia": "Thailand",
+    "thailand": "Thailand",
+    "china": "China",
+    "japão": "Japan",
+    "japao": "Japan",
+    "japan": "Japan",
+    "taiwan": "Taiwan",
+    "filipinas": "Philippines",
+    "philippines": "Philippines",
+    "vietnã": "Vietnam",
+    "vietnam": "Vietnam",
+}
+
+EDITORIAL_PRESETS = [
+    {
+        "key": "popular",
+        "title": "Em Alta no HuaPlay",
+        "section_type": "popular",
+        "filter_value": "",
+        "item_limit": 18,
+        "is_anchor": True,
+        "badge": "Mais Assistidos",
+        "description": "Os doramas mais assistidos e populares da plataforma.",
+    },
+    {
+        "key": "latest",
+        "title": "Novos Lançamentos",
+        "section_type": "latest",
+        "filter_value": "",
+        "item_limit": 18,
+        "is_anchor": True,
+        "badge": "Lançamentos Recentes",
+        "description": "Últimas produções asiáticas adicionadas ao catálogo.",
+    },
+    {
+        "key": "wuxia",
+        "title": "Dramas de Época, Wuxia & Xianxia",
+        "section_type": "genre",
+        "filter_value": "Wuxia",
+        "item_limit": 18,
+        "is_anchor": False,
+        "badge": "C-Drama Épico",
+        "description": "Artes marciais chinesas, dinastias imperiais e fantasia heroica.",
+    },
+    {
+        "key": "korea",
+        "title": "Doramas Coreanos em Destaque",
+        "section_type": "country",
+        "filter_value": "South Korea",
+        "item_limit": 18,
+        "is_anchor": False,
+        "badge": "K-Drama",
+        "description": "O melhor dos K-Dramas com elencos aclamados e produções de ponta.",
+    },
+    {
+        "key": "thailand",
+        "title": "Sucessos da Tailândia & Lakorns",
+        "section_type": "country",
+        "filter_value": "Thailand",
+        "item_limit": 18,
+        "is_anchor": False,
+        "badge": "Thai Drama",
+        "description": "Romances dramáticos, lakorns e as séries tailandesas mais amadas.",
+    },
+    {
+        "key": "romcom",
+        "title": "Comédias Românticas Imperdíveis",
+        "section_type": "genre",
+        "filter_value": "Comédia",
+        "item_limit": 18,
+        "is_anchor": False,
+        "badge": "Rom-Com",
+        "description": "Histórias apaixonantes, leves e repletas de momentos divertidos.",
+    },
+    {
+        "key": "youth",
+        "title": "Romance Escolar & Juventude",
+        "section_type": "genre",
+        "filter_value": "Youth",
+        "item_limit": 18,
+        "is_anchor": False,
+        "badge": "Juventude",
+        "description": "Primeiro amor, amizades inesquecíveis e nostalgia dos tempos de colégio.",
+    },
+    {
+        "key": "contract",
+        "title": "Casamento por Contrato & Coabitação",
+        "section_type": "genre",
+        "filter_value": "Contrato",
+        "item_limit": 18,
+        "is_anchor": False,
+        "badge": "Tropo Amado",
+        "description": "Casamentos falsos e convivências forçadas que viram amor verdadeiro.",
+    },
+    {
+        "key": "bl",
+        "title": "Séries BL & LGBTQIA+ Asiáticas",
+        "section_type": "genre",
+        "filter_value": "LGBTQIA+",
+        "item_limit": 18,
+        "is_anchor": False,
+        "badge": "Boys Love",
+        "description": "Grandes romances Boys Love e produções LGBTQIA+ da Tailândia e Ásia.",
+    },
+    {
+        "key": "minis",
+        "title": "Mini-Dramas & Web-Séries Chinesas",
+        "section_type": "genre",
+        "filter_value": "Minis",
+        "item_limit": 18,
+        "is_anchor": False,
+        "badge": "Minis",
+        "description": "Dramas chineses em episódios rápidos, intensos e viciantes.",
+    },
+    {
+        "key": "movies",
+        "title": "Sessão de Cinema Asiático",
+        "section_type": "type",
+        "filter_value": "Movie",
+        "item_limit": 18,
+        "is_anchor": False,
+        "badge": "Filmes",
+        "description": "Longas-metragens emocionantes dos cinemas chinês, coreano e japonês.",
+    },
+    {
+        "key": "fantasy",
+        "title": "Fantasia, Sobrenatural & Mitologia",
+        "section_type": "genre",
+        "filter_value": "Fantasy",
+        "item_limit": 18,
+        "is_anchor": False,
+        "badge": "Xianxia & Magia",
+        "description": "Reinos imortais, magia, reencarnação e seres sobrenaturais.",
+    },
+    {
+        "key": "mystery",
+        "title": "Mistério, Crime & Suspense",
+        "section_type": "genre",
+        "filter_value": "Mistério",
+        "item_limit": 18,
+        "is_anchor": False,
+        "badge": "Suspense",
+        "description": "Investigações intrigantes, segredos do passado e suspense psicológico.",
+    },
+    {
+        "key": "office",
+        "title": "Romances de Escritório & Trabalho",
+        "section_type": "genre",
+        "filter_value": "Escritório",
+        "item_limit": 18,
+        "is_anchor": False,
+        "badge": "Office Romance",
+        "description": "Chefes exigentes, química irresistível e romances no ambiente corporativo.",
+    },
+    {
+        "key": "japan",
+        "title": "Dramas Japoneses (J-Dramas)",
+        "section_type": "country",
+        "filter_value": "Japan",
+        "item_limit": 18,
+        "is_anchor": False,
+        "badge": "J-Drama",
+        "description": "A delicadeza, o humor e as histórias tocantes da televisão japonesa.",
+    },
+    {
+        "key": "taiwan",
+        "title": "Romances de Taiwan",
+        "section_type": "country",
+        "filter_value": "Taiwan",
+        "item_limit": 18,
+        "is_anchor": False,
+        "badge": "TW-Drama",
+        "description": "Dramas românticos taiwaneses envolventes com fortes emoções.",
+    },
+]
 
 
 def resolve_home_section_items(section: models.HomeSection, db: Session):
@@ -33,7 +216,8 @@ def resolve_home_section_items(section: models.HomeSection, db: Session):
     elif kind == "type" and value:
         query = query.filter(models.Series.type == value)
     elif kind == "country" and value:
-        query = query.filter(models.Series.country.ilike(f"%{value}%"))
+        mapped = COUNTRY_ALIASES.get(value.lower().strip(), value)
+        query = query.filter(or_(models.Series.country.ilike(f"%{value}%"), models.Series.country.ilike(f"%{mapped}%")))
     elif kind == "status" and value:
         query = query.filter(models.Series.status == value)
     return query.order_by(models.Series.created_at.desc(), models.Series.id.desc()).limit(limit).all()
@@ -77,6 +261,8 @@ def get_home_section_options(db: Session = Depends(get_db)):
             cleaned = genre.strip()
             if cleaned:
                 genres_by_key.setdefault(cleaned.casefold(), cleaned)
+    for row in db.query(models.CatalogGenre).all():
+        genres_by_key.setdefault(row.name.casefold(), row.name)
     return {"genres": sorted(genres_by_key.values(), key=str.casefold)}
 
 
@@ -140,6 +326,119 @@ def delete_home_section(section_id: int, db: Session = Depends(get_db)):
         item.position = position
     db.commit()
     return None
+
+
+@admin_router.get("/home-section-presets")
+def get_home_section_presets(db: Session = Depends(get_db)):
+    """Return all curated Asian presets with catalog match counts and added status."""
+    existing_sections = db.query(models.HomeSection).all()
+    existing_keys = {(s.section_type, (s.filter_value or "").strip().lower()) for s in existing_sections}
+    existing_titles = {s.title.strip().lower() for s in existing_sections}
+
+    results = []
+    for preset in EDITORIAL_PRESETS:
+        kind = preset["section_type"]
+        val = (preset["filter_value"] or "").strip()
+        mapped = COUNTRY_ALIASES.get(val.lower(), val) if kind == "country" else val
+
+        q = db.query(func.count(models.Series.id)).filter(models.Series.publication_status == "published")
+        if kind == "country":
+            q = q.filter(or_(models.Series.country.ilike(f"%{val}%"), models.Series.country.ilike(f"%{mapped}%")))
+        elif kind == "genre":
+            q = q.filter(models.Series.genre.ilike(f"%{val}%"))
+        elif kind == "type":
+            q = q.filter(models.Series.type == val)
+
+        count = q.scalar() or 0
+        is_added = (kind, val.lower()) in existing_keys or preset["title"].strip().lower() in existing_titles
+
+        results.append({
+            **preset,
+            "count": count,
+            "is_added": is_added,
+        })
+    return results
+
+
+@admin_router.post("/home-sections/auto-curate", response_model=list[schemas.HomeSection])
+def auto_curate_home_sections(db: Session = Depends(get_db)):
+    """Apply the complete, curated Asian drama catalog lineup (12-16 sections)."""
+    db.query(models.HomeSection).delete()
+    db.commit()
+
+    created = []
+    pos = 0
+    for preset in EDITORIAL_PRESETS:
+        kind = preset["section_type"]
+        val = preset["filter_value"]
+        if not preset.get("is_anchor"):
+            mapped = COUNTRY_ALIASES.get(val.lower(), val) if kind == "country" else val
+            q = db.query(func.count(models.Series.id)).filter(models.Series.publication_status == "published")
+            if kind == "country":
+                q = q.filter(or_(models.Series.country.ilike(f"%{val}%"), models.Series.country.ilike(f"%{mapped}%")))
+            elif kind == "genre":
+                q = q.filter(models.Series.genre.ilike(f"%{val}%"))
+            elif kind == "type":
+                q = q.filter(models.Series.type == val)
+            if (q.scalar() or 0) < 8:
+                continue
+
+        section = models.HomeSection(
+            title=preset["title"],
+            section_type=preset["section_type"],
+            filter_value=preset["filter_value"],
+            item_limit=preset.get("item_limit", 18),
+            position=pos,
+            is_active=True,
+        )
+        db.add(section)
+        created.append(section)
+        pos += 1
+
+    db.commit()
+    for s in created:
+        db.refresh(s)
+    return [home_section_payload(s, db) for s in created]
+
+
+@admin_router.post("/home-sections/rotate", response_model=list[schemas.HomeSection])
+def rotate_home_sections(db: Session = Depends(get_db)):
+    """Keep anchors (positions 0 & 1) fixed and shuffle the thematic rows."""
+    sections = db.query(models.HomeSection).order_by(models.HomeSection.position.asc()).all()
+    if len(sections) > 3:
+        anchors = sections[:2]
+        thematics = list(sections[2:])
+        random.shuffle(thematics)
+        all_ordered = anchors + thematics
+        for pos, s in enumerate(all_ordered):
+            s.position = pos
+        db.commit()
+    sections = db.query(models.HomeSection).order_by(models.HomeSection.position.asc()).all()
+    return [home_section_payload(s, db) for s in sections]
+
+
+@admin_router.post("/home-sections/add-preset", response_model=schemas.HomeSection, status_code=status.HTTP_201_CREATED)
+def add_preset_home_section(data: dict, db: Session = Depends(get_db)):
+    """Add a specific preset directly to the Home."""
+    preset_key = data.get("key")
+    preset = next((p for p in EDITORIAL_PRESETS if p["key"] == preset_key), None)
+    if not preset:
+        raise HTTPException(status_code=404, detail="Preset não encontrado")
+
+    max_position = db.query(func.max(models.HomeSection.position)).scalar()
+    new_pos = (max_position + 1) if max_position is not None else 0
+    section = models.HomeSection(
+        title=preset["title"],
+        section_type=preset["section_type"],
+        filter_value=preset["filter_value"],
+        item_limit=preset.get("item_limit", 18),
+        position=new_pos,
+        is_active=True,
+    )
+    db.add(section)
+    db.commit()
+    db.refresh(section)
+    return home_section_payload(section, db)
 
 
 @public_router.post("/reports", response_model=schemas.PlaybackReport, status_code=status.HTTP_201_CREATED)
