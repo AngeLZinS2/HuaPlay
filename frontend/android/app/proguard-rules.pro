@@ -6,6 +6,31 @@
 #   http://developer.android.com/guide/developing/tools/proguard.html
 
 # Capacitor Bridge and Plugin rules
+-keepattributes *Annotation*,AnnotationDefault
+
+-keep @interface com.getcapacitor.annotation.CapacitorPlugin {
+    *;
+}
+-keep @interface com.getcapacitor.annotation.Permission {
+    *;
+}
+-keep @interface com.getcapacitor.annotation.PermissionCallback {
+    *;
+}
+-keep @interface com.getcapacitor.annotation.ActivityCallback {
+    *;
+}
+-keep class com.getcapacitor.annotation.** {
+    *;
+}
+
+-keep class com.getcapacitor.PluginHandle {
+    *;
+}
+-keepclassmembers class com.getcapacitor.PluginHandle {
+    private <fields>;
+}
+
 -keep public class * extends com.getcapacitor.Plugin {
     public *;
 }
