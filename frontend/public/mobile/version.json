@@ -1,0 +1,12 @@
+{
+  "versionCode": 4,
+  "versionName": "1.0.3",
+  "apkUrl": "https://huaplay.playdb.info/downloads/huaplay/HuaPlay-1.0.3.apk",
+  "sha256": "4f34873f97ed15e3616af3a27173939ee4ae65af8227e3b51bd7ae8417ceb86c",
+  "releaseNotes": [
+    "Download direto no aplicativo com barra de progresso em tempo real",
+    "Instalação nativa via instalador do sistema Android sem abrir navegador",
+    "Validação criptográfica de integridade e assinatura do pacote",
+    "Melhorias de desempenho e estabilidade geral"
+  ]
+}

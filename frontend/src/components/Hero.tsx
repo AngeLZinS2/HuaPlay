@@ -7,18 +7,205 @@ import { useAuth } from '../context/AuthContext';
 import { addToMyList, removeFromMyList } from '../services/userData';
 import { useToast } from '../context/ToastContext';
 import { getTrailerEmbed } from '../utils/trailer';
+import { getYouTubeVideoId } from '../utils/youtube';
 import { getOptimizedImageUrl } from '../utils/image';
+import { useHeroDeviceMode, type HeroDeviceMode } from '../hooks/useHeroDeviceMode';
+import CompactHeroTrailer from './CompactHeroTrailer';
 
-export default function Hero() {
-    const [featured, setFeatured] = useState<any | null>(null);
-    const [loading, setLoading] = useState(true);
+export interface FeaturedSeries {
+    id: number | string;
+    title: string;
+    slug?: string;
+    type?: string;
+    genre?: string;
+    release_year?: number | string;
+    status?: string;
+    description?: string;
+    cover_image?: string;
+    banner_image?: string;
+    trailer_url?: string;
+    feature_type?: 'BANNER' | 'TRAILER' | string;
+}
+
+interface HeroProps {
+    initialFeatured?: FeaturedSeries | null;
+    featuredPromise?: Promise<FeaturedSeries | null> | null;
+}
+
+interface CompactHeroCardProps {
+    featured: FeaturedSeries;
+    heroMode: HeroDeviceMode;
+    mobileTags: string[];
+    mobilePlayLabel: string;
+    isInList: boolean;
+    onToggleList: () => void;
+    onNavigate: () => void;
+}
+
+/**
+ * Componente isolado do Cartão Compacto.
+ * Recebe key única combinando modo + featured.id + trailer_url no parent, garantindo que
+ * ao alternar o Fold ou trocar de conteúdo, o estado monte com player limpo e MUTED,
+ * sem vazamento de estado e sem efeito tardio de setState.
+ */
+function CompactHeroCard({
+    featured,
+    heroMode,
+    mobileTags,
+    mobilePlayLabel,
+    isInList,
+    onToggleList,
+    onNavigate,
+}: CompactHeroCardProps) {
+    const [isCompactMuted, setIsCompactMuted] = useState(true);
+    const [compactTrailerPlaying, setCompactTrailerPlaying] = useState(false);
+    const [compactTrailerFailed, setCompactTrailerFailed] = useState(false);
+
+    const youtubeId = featured.trailer_url ? getYouTubeVideoId(featured.trailer_url) : null;
+    const shouldMountCompactTrailer = Boolean(
+        heroMode === 'tablet-fold' &&
+        youtubeId &&
+        featured.feature_type !== 'BANNER' &&
+        !compactTrailerFailed
+    );
+
+    const compactImageSrc = heroMode === 'tablet-fold' && featured.banner_image
+        ? getOptimizedImageUrl(featured.banner_image, 'backdrop')
+        : getOptimizedImageUrl(featured.cover_image || featured.banner_image, 'poster');
+
+    // Regra de altura do cartão:
+    // Limite de altura SOMENTE no compacto quando largura < 768 (onde o bottomnav existe),
+    // usando max-height de viewport disponível descontando 80px (header) + env(safe-top) + 68px (nav) + max(16px, env(safe-bottom)) + folga ~48px para o título da primeira fileira.
+    // Em telas >= 768 (tablet/desktop), conserva o cartão atual sem alteração (md:max-h-[620px] e md:min-h-[460px]).
+    // Para celulares paisagem < 768 (ex: 667x375), permite min-h-[220px] para caber no viewport sem corte.
+    const cardHeightClass = heroMode === 'tablet-fold'
+        ? 'h-[72vh] min-h-[220px] md:min-h-[460px] max-h-[calc(100svh-196px-env(safe-area-inset-top,0px)-max(16px,env(safe-area-inset-bottom,0px)))] md:max-h-[620px]'
+        : 'h-[74vh] min-h-[220px] md:min-h-[300px] max-h-[calc(100svh-196px-env(safe-area-inset-top,0px)-max(16px,env(safe-area-inset-bottom,0px)))] md:max-h-[580px]';
+
+    return (
+        /* outerHero compacto: pt-[calc(5rem+env(safe-area-inset-top,0px))] garante que o card
+           fique perfeitamente alinhado abaixo do header de 80px (5rem).
+           Compensação md:pb-16 neutraliza o md:-mt-12 aplicado pela Home nas fileiras em >= 768px. */
+        <div className="w-full px-3.5 sm:px-6 pt-[calc(5rem+env(safe-area-inset-top,0px))] pb-3 md:pb-16">
+            <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.6, ease: 'easeOut' }}
+                className={`relative w-full ${cardHeightClass} rounded-2xl overflow-hidden border border-white/15 shadow-[0_12px_40px_rgba(0,0,0,0.85)] bg-neutral-950 flex flex-col justify-end`}
+            >
+                {/* Capa estática de fundo: sempre presente para evitar flash e como fallback */}
+                <img
+                    src={compactImageSrc}
+                    alt={featured.title}
+                    decoding="async"
+                    className="absolute inset-0 w-full h-full object-cover object-top select-none pointer-events-none z-0"
+                />
+
+                {/* Trailer Inline de alta fidelidade: apenas em tablet-fold com YouTube compatível */}
+                {shouldMountCompactTrailer && youtubeId && (
+                    <CompactHeroTrailer
+                        videoId={youtubeId}
+                        title={featured.title}
+                        isMuted={isCompactMuted}
+                        onPlayingChange={(playing) => setCompactTrailerPlaying(playing)}
+                        onMuteChange={(muted) => setIsCompactMuted(muted)}
+                        onFallback={() => {
+                            setCompactTrailerFailed(true);
+                            setCompactTrailerPlaying(false);
+                        }}
+                    />
+                )}
+
+                {/* Botão discreto de som: SÓ visível se o trailer compacto estiver efetivamente reproduzindo */}
+                {compactTrailerPlaying && (
+                    <button
+                        type="button"
+                        onClick={() => setIsCompactMuted((prev) => !prev)}
+                        aria-label={isCompactMuted ? 'Ativar som do trailer' : 'Silenciar trailer'}
+                        aria-pressed={!isCompactMuted}
+                        title={isCompactMuted ? 'Ativar som' : 'Silenciar'}
+                        className="absolute top-4 right-4 z-20 p-2.5 rounded-full bg-black/60 hover:bg-black/80 active:scale-95 text-white/90 border border-white/15 backdrop-blur-md transition-all shadow-lg"
+                    >
+                        {isCompactMuted ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
+                    </button>
+                )}
+
+                {/* Vinheta sutil no topo do cartão */}
+                <div className="absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-black/60 via-black/20 to-transparent pointer-events-none z-10" />
+
+                {/* Gradiente escuro na base para legibilidade máxima dos títulos e botões */}
+                <div className="absolute inset-x-0 bottom-0 h-3/5 bg-gradient-to-t from-black via-black/80 via-45% to-transparent pointer-events-none z-10" />
+
+                {/* Conteúdo flutuante dentro do cartão */}
+                <div className="relative z-10 px-4 pb-4 pt-4 sm:pt-6 flex flex-col items-center text-center">
+                    {/* Título */}
+                    <h1 className="text-2xl sm:text-3xl font-display font-bold text-white tracking-wide drop-shadow-[0_2px_10px_rgba(0,0,0,0.9)] line-clamp-2 leading-tight max-w-[92%]">
+                        {featured.title}
+                    </h1>
+
+                    {/* Gêneros/Tags mínimos: UMA linha truncada sem quebras */}
+                    <div className="flex items-center justify-center flex-nowrap overflow-hidden max-w-[92%] truncate text-xs text-gray-200 font-medium tracking-wide mt-1.5 mb-3 sm:mt-2 sm:mb-4 drop-shadow">
+                        {mobileTags.map((tag, idx) => (
+                            <span key={idx} className="flex items-center gap-2 shrink-0">
+                                <span className="truncate">{tag}</span>
+                                {idx < mobileTags.length - 1 && (
+                                    <span className="text-gray-400 text-[10px] select-none shrink-0">•</span>
+                                )}
+                            </span>
+                        ))}
+                    </div>
+
+                    {/* Botões de Ação verticais no estilo HuaPlay */}
+                    <div className="w-full max-w-md flex flex-col gap-2 sm:gap-2.5">
+                        {/* Botão Primário: Assistir */}
+                        <motion.button
+                            whileTap={{ scale: 0.98 }}
+                            onClick={onNavigate}
+                            className="w-full py-2.5 px-4 bg-white hover:bg-neutral-200 active:bg-neutral-300 text-black font-semibold text-sm rounded-md flex items-center justify-center gap-2 transition-all shadow-md"
+                        >
+                            <Play className="w-4 h-4 fill-black text-black" />
+                            <span>{mobilePlayLabel}</span>
+                        </motion.button>
+
+                        {/* Botão Secundário: Minha Lista */}
+                        <motion.button
+                            whileTap={{ scale: 0.98 }}
+                            onClick={onToggleList}
+                            className="w-full py-2.5 px-4 bg-[#262626]/85 hover:bg-[#333333] active:bg-[#404040] text-white font-medium text-sm rounded-md flex items-center justify-center gap-2 border border-white/10 backdrop-blur-md transition-all"
+                        >
+                            {isInList ? (
+                                <>
+                                    <Check className="w-4 h-4 text-white" />
+                                    <span>Minha lista</span>
+                                </>
+                            ) : (
+                                <>
+                                    <Plus className="w-4 h-4 text-white" />
+                                    <span>Minha lista</span>
+                                </>
+                            )}
+                        </motion.button>
+                    </div>
+                </div>
+            </motion.div>
+        </div>
+    );
+}
+
+export default function Hero({ initialFeatured, featuredPromise }: HeroProps = {}) {
+    const [featured, setFeatured] = useState<FeaturedSeries | null>(initialFeatured ?? null);
+    const [loading, setLoading] = useState<boolean>(
+        initialFeatured !== undefined ? !initialFeatured : true
+    );
     const [isMuted, setIsMuted] = useState(true);
+
     const iframeRef = useRef<HTMLIFrameElement>(null);
     const navigate = useNavigate();
+    const heroMode = useHeroDeviceMode();
     const { uid, currentProfile, myListIds, updateLists, isAuthenticated } = useAuth();
     const { addToast } = useToast();
 
-    const isInList = featured ? myListIds.includes(featured.id) : false;
+    const isInList = featured ? myListIds.includes(Number(featured.id)) : false;
 
     const handleToggleList = async () => {
         if (!featured) return;
@@ -30,10 +217,10 @@ export default function Hero() {
         try {
             if (!uid || !currentProfile) return;
             if (isInList) {
-                await removeFromMyList(uid, currentProfile.id, featured.id);
+                await removeFromMyList(uid, currentProfile.id, Number(featured.id));
                 addToast('Removido da sua lista', 'info');
             } else {
-                await addToMyList(uid, currentProfile.id, featured.id);
+                await addToMyList(uid, currentProfile.id, Number(featured.id));
                 addToast('Adicionado à sua lista', 'success');
             }
             await updateLists();
@@ -44,32 +231,75 @@ export default function Hero() {
     };
 
     useEffect(() => {
-        const fetchFeatured = async () => {
+        const controller = new AbortController();
+        let isCancelled = false;
+
+        const loadFeatured = async () => {
             try {
-                const response = await api.get('/series/hero-featured');
-                if (response.data) {
-                    setFeatured(response.data);
+                let data: FeaturedSeries | null = null;
+                if (initialFeatured) {
+                    data = initialFeatured;
+                } else if (featuredPromise !== undefined) {
+                    data = featuredPromise ? await featuredPromise : null;
+                } else if (initialFeatured !== undefined) {
+                    data = initialFeatured;
+                } else {
+                    const res = await api.get('/series/hero-featured', { signal: controller.signal });
+                    data = res.data;
                 }
-            } catch (error) {
+
+                if (isCancelled) return;
+
+                if (data) {
+                    setFeatured(data);
+                    setLoading(false);
+                    return;
+                }
+
+                // If hero data is null/empty or failed, trigger fallback
+                const fallbackRes = await api.get('/series/?limit=30', { signal: controller.signal });
+                if (isCancelled) return;
+                const pool = (fallbackRes.data || []).filter((s: FeaturedSeries) => s.banner_image);
+                if (pool.length > 0) {
+                    setFeatured(pool[Math.floor(Math.random() * pool.length)]);
+                }
+            } catch (error: unknown) {
+                const err = error as { name?: string };
+                if (isCancelled || err?.name === 'AbortError' || err?.name === 'CanceledError') {
+                    return;
+                }
                 console.error("Failed to fetch hero featured series:", error);
                 try {
-                    const fallbackRes = await api.get('/series/?limit=30');
-                    const pool = (fallbackRes.data || []).filter((s: any) => s.banner_image);
+                    const fallbackRes = await api.get('/series/?limit=30', { signal: controller.signal });
+                    if (isCancelled) return;
+                    const pool = (fallbackRes.data || []).filter((s: FeaturedSeries) => s.banner_image);
                     if (pool.length > 0) {
                         setFeatured(pool[Math.floor(Math.random() * pool.length)]);
                     }
-                } catch (e) {
-                    console.error("Fallback featured failed:", e);
+                } catch (fallbackError: unknown) {
+                    const fbErr = fallbackError as { name?: string };
+                    if (!isCancelled && fbErr?.name !== 'AbortError' && fbErr?.name !== 'CanceledError') {
+                        console.error("Fallback featured failed:", fallbackError);
+                    }
                 }
             } finally {
-                setLoading(false);
+                if (!isCancelled) {
+                    setLoading(false);
+                }
             }
         };
-        fetchFeatured();
-    }, []);
 
+        loadFeatured();
+
+        return () => {
+            isCancelled = true;
+            controller.abort();
+        };
+    }, [initialFeatured, featuredPromise]);
+
+    // Áudio do trailer Desktop via postMessage
     useEffect(() => {
-        if (iframeRef.current && iframeRef.current.contentWindow) {
+        if (heroMode === 'desktop' && iframeRef.current && iframeRef.current.contentWindow) {
             const command = isMuted ? 'mute' : 'unMute';
             iframeRef.current.contentWindow.postMessage(JSON.stringify({
                 'event': 'command',
@@ -77,7 +307,7 @@ export default function Hero() {
                 'args': []
             }), '*');
         }
-    }, [isMuted, featured]);
+    }, [isMuted, featured, heroMode]);
 
     if (loading) {
         return <div className="relative h-screen w-full bg-black" />;
@@ -111,18 +341,6 @@ export default function Hero() {
         );
     }
 
-
-
-    // Single source of truth: the mute control must follow whether a trailer is
-    // actually playing, not merely whether the series has a trailer_url. A series
-    // in BANNER mode shows a still image even when it has one, and a link we
-    // cannot turn into an embed falls back to the still image too — rendering the
-    // iframe anyway is what left the banner black for non-YouTube embed links.
-    const trailer = getTrailerEmbed(featured.trailer_url, { hd: true });
-    const showsTrailer = Boolean(
-        trailer && (featured.feature_type === 'TRAILER' || !featured.feature_type),
-    );
-
     const typeLabel = featured.type === 'Movie'
         ? 'Filme'
         : featured.type === 'Anime'
@@ -142,86 +360,15 @@ export default function Hero() {
     const mobileTags = [typeLabel, ...genreList];
     const mobilePlayLabel = featured.type === 'Movie' ? 'Assistir ao filme' : 'Assistir à série';
 
-    return (
-        <>
-            {/* Mobile Hero: Netflix-style Floating Poster Card */}
-            <div className="block md:hidden w-full px-3.5 pt-20 pb-3">
-                <motion.div
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.6, ease: 'easeOut' }}
-                    className="relative w-full h-[70vh] min-h-[480px] max-h-[580px] rounded-2xl overflow-hidden border border-white/15 shadow-[0_12px_40px_rgba(0,0,0,0.85)] bg-neutral-950 flex flex-col justify-end"
-                >
-                    {/* Poster Image */}
-                    <img
-                        src={getOptimizedImageUrl(featured.cover_image || featured.banner_image, 'poster')}
-                        alt={featured.title}
-                        decoding="async"
-                        className="absolute inset-0 w-full h-full object-cover object-top select-none pointer-events-none"
-                    />
+    // RENDERIZAÇÃO CONDICIONAL NO REACT: APENAS ÁRVORE COMPACTA OU DESKTOP
+    if (heroMode === 'desktop') {
+        const trailer = getTrailerEmbed(featured.trailer_url, { hd: true });
+        const showsTrailer = Boolean(
+            trailer && (featured.feature_type === 'TRAILER' || !featured.feature_type),
+        );
 
-                    {/* Top Subtle Vignette */}
-                    <div className="absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-black/60 via-black/20 to-transparent pointer-events-none" />
-
-                    {/* Bottom Rich Gradient for maximum text and button readability */}
-                    <div className="absolute inset-x-0 bottom-0 h-3/5 bg-gradient-to-t from-black via-black/80 via-45% to-transparent pointer-events-none" />
-
-                    {/* Floating Content inside the card */}
-                    <div className="relative z-10 px-4 pb-4 pt-6 flex flex-col items-center text-center">
-                        {/* Title */}
-                        <h1 className="text-2xl sm:text-3xl font-display font-bold text-white tracking-wide drop-shadow-[0_2px_10px_rgba(0,0,0,0.9)] line-clamp-2 leading-tight max-w-[92%]">
-                            {featured.title}
-                        </h1>
-
-                        {/* Minimal Genres/Tags: single line separated by dots */}
-                        <div className="flex items-center justify-center flex-wrap gap-x-2 gap-y-1 text-xs text-gray-200 font-medium tracking-wide mt-2 mb-4 drop-shadow">
-                            {mobileTags.map((tag, idx) => (
-                                <span key={idx} className="flex items-center gap-2">
-                                    <span>{tag}</span>
-                                    {idx < mobileTags.length - 1 && (
-                                        <span className="text-gray-400 text-[10px] select-none">•</span>
-                                    )}
-                                </span>
-                            ))}
-                        </div>
-
-                        {/* Action Buttons: Netflix style stacked */}
-                        <div className="w-full flex flex-col gap-2.5">
-                            {/* Primary Button: Solid White */}
-                            <motion.button
-                                whileTap={{ scale: 0.98 }}
-                                onClick={() => navigate(`/series/${featured.slug || featured.id}`)}
-                                className="w-full py-2.5 px-4 bg-white hover:bg-neutral-200 active:bg-neutral-300 text-black font-semibold text-sm rounded-md flex items-center justify-center gap-2 transition-all shadow-md"
-                            >
-                                <Play className="w-4 h-4 fill-black text-black" />
-                                <span>{mobilePlayLabel}</span>
-                            </motion.button>
-
-                            {/* Secondary Button: Frosted Dark */}
-                            <motion.button
-                                whileTap={{ scale: 0.98 }}
-                                onClick={handleToggleList}
-                                className="w-full py-2.5 px-4 bg-[#262626]/85 hover:bg-[#333333] active:bg-[#404040] text-white font-medium text-sm rounded-md flex items-center justify-center gap-2 border border-white/10 backdrop-blur-md transition-all"
-                            >
-                                {isInList ? (
-                                    <>
-                                        <Check className="w-4 h-4 text-white" />
-                                        <span>Minha lista</span>
-                                    </>
-                                ) : (
-                                    <>
-                                        <Plus className="w-4 h-4 text-white" />
-                                        <span>Minha lista</span>
-                                    </>
-                                )}
-                            </motion.button>
-                        </div>
-                    </div>
-                </motion.div>
-            </div>
-
-            {/* Desktop Hero: Wide Cinematic Banner */}
-            <div className="hidden md:block relative h-screen w-full overflow-hidden">
+        return (
+            <div className="relative h-screen w-full overflow-hidden">
                 {/* Background Video/Image */}
                 <div className="absolute inset-0 select-none pointer-events-none">
                     {showsTrailer ? (
@@ -323,6 +470,20 @@ export default function Hero() {
                     </button>
                 )}
             </div>
-        </>
+        );
+    }
+
+    // ÁRVORE COMPACTA: keyed por heroMode + featured.id + trailer_url
+    return (
+        <CompactHeroCard
+            key={`${heroMode}-${featured.id}-${featured.trailer_url || ''}`}
+            featured={featured}
+            heroMode={heroMode}
+            mobileTags={mobileTags}
+            mobilePlayLabel={mobilePlayLabel}
+            isInList={isInList}
+            onToggleList={handleToggleList}
+            onNavigate={() => navigate(`/series/${featured.slug || featured.id}`)}
+        />
     );
 }

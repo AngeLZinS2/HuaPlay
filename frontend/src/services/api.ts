@@ -112,8 +112,8 @@ export interface SeriesQuery {
     is_featured?: boolean;
 }
 
-export const getSeries = async (params?: SeriesQuery): Promise<Series[]> => {
-    const response = await api.get<Series[]>('/series/', { params });
+export const getSeries = async (params?: SeriesQuery, signal?: AbortSignal): Promise<Series[]> => {
+    const response = await api.get<Series[]>('/series/', { params, signal });
     return response.data;
 };
 

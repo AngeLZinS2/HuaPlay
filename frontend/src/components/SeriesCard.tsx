@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, memo } from 'react';
 import { motion } from 'framer-motion';
 import { Play, Plus, Check, ThumbsUp, ChevronDown } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
@@ -7,6 +7,8 @@ import { addToMyList, removeFromMyList, likeSeries, unlikeSeries } from '../serv
 import { useToast } from '../context/ToastContext';
 import { getTrailerEmbed } from '../utils/trailer';
 import { getOptimizedImageUrl } from '../utils/image';
+import { useIsMobile } from '../hooks/useIsMobile';
+import { useSeriesCardIntersection } from '../hooks/useSeriesCardIntersection';
 
 interface SeriesCardProps {
     item: any;
@@ -16,7 +18,7 @@ interface SeriesCardProps {
     variant?: 'default' | 'profile';
 }
 
-export default function SeriesCard({ item, onOpenModal, isFirst, isLast, variant = 'default' }: SeriesCardProps) {
+function SeriesCard({ item, onOpenModal, isFirst, isLast, variant = 'default' }: SeriesCardProps) {
     const [isHovered, setIsHovered] = useState(false);
     const [showTrailer, setShowTrailer] = useState(false);
     const [imageLoaded, setImageLoaded] = useState(false);
@@ -29,17 +31,13 @@ export default function SeriesCard({ item, onOpenModal, isFirst, isLast, variant
     // poster instead of swapping in a dead iframe.
     const trailer = getTrailerEmbed(item.trailer_url);
 
-    const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+    const isMobile = useIsMobile();
+    const { ref: cardRef, isVisible } = useSeriesCardIntersection<HTMLDivElement>();
+    const shouldLoadImage = isVisible || isHovered;
 
     // Local optimistic UI state
     const [isInList, setIsInList] = useState(false);
     const [isLiked, setIsLiked] = useState(false);
-
-    useEffect(() => {
-        const handleResize = () => setIsMobile(window.innerWidth < 768);
-        window.addEventListener('resize', handleResize);
-        return () => window.removeEventListener('resize', handleResize);
-    }, []);
 
     useEffect(() => {
         if (myListIds) setIsInList(myListIds.includes(item.id));
@@ -114,8 +112,13 @@ export default function SeriesCard({ item, onOpenModal, isFirst, isLast, variant
         }
     };
 
+    const posterSrc = imageError
+        ? (item.banner_image || "https://images.unsplash.com/photo-1536440136628-849c177e76a1?q=80&w=600&auto=format&fit=crop")
+        : getOptimizedImageUrl(item.cover_image || item.image, 'poster');
+
     return (
         <div
+            ref={cardRef}
             className="group relative flex-none w-[140px] md:w-[200px] h-[210px] md:h-[300px] z-[0] hover:z-[999]"
             onMouseEnter={() => !isMobile && setIsHovered(true)}
             onMouseLeave={() => !isMobile && setIsHovered(false)}
@@ -166,7 +169,7 @@ export default function SeriesCard({ item, onOpenModal, isFirst, isLast, variant
                         />
                     ) : (
                         <img
-                            src={imageError ? (item.banner_image || "https://images.unsplash.com/photo-1536440136628-849c177e76a1?q=80&w=600&auto=format&fit=crop") : getOptimizedImageUrl(item.cover_image || item.image, 'poster')}
+                            src={shouldLoadImage ? posterSrc : undefined}
                             alt={item.title}
                             loading="lazy"
                             decoding="async"
@@ -246,3 +249,5 @@ export default function SeriesCard({ item, onOpenModal, isFirst, isLast, variant
         </div>
     );
 }
+
+export default memo(SeriesCard);

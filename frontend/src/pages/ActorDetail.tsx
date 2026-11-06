@@ -86,6 +86,7 @@ const ActorDetail = () => {
                     <img
                         src={getOptimizedImageUrl(actor.image_url, 'poster')}
                         alt=""
+                        decoding="async"
                         className="absolute inset-0 w-full h-full object-cover opacity-30 blur-3xl scale-110"
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-[#0a0a0a] via-[#0a0a0a]/60 to-transparent" />
@@ -107,6 +108,7 @@ const ActorDetail = () => {
                             <img
                                 src={getOptimizedImageUrl(actor.image_url, 'poster')}
                                 alt={actor.name}
+                                decoding="async"
                                 className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
                             />
                             <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />

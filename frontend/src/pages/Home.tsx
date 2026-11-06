@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import Hero from '../components/Hero';
 import { useModal } from '../context/ModalContext';
 import SeriesRow from '../components/SeriesRow';
@@ -20,6 +20,8 @@ export default function Home() {
     const [managedRows, setManagedRows] = useState<Array<{ id: number; title: string; items: any[] }>>([]);
     const [hasManagedHome, setHasManagedHome] = useState(false);
     const [loading, setLoading] = useState(true);
+    const [heroFeatured, setHeroFeatured] = useState<any | null | undefined>(undefined);
+    const heroPromiseRef = useRef<Promise<any> | null>(null);
     const { openModal } = useModal();
 
     useHomeInactivityRedirect(isAuthenticated && Boolean(currentProfile));
@@ -47,46 +49,104 @@ export default function Home() {
     // used to put the whole page back into its full-screen loading state, which
     // looked like a browser refresh after every click.
     useEffect(() => {
+        const controller = new AbortController();
+        let isCancelled = false;
+
+        // Start hero request alongside sections (fresh controller per effect setup, no duplicate request)
+        const heroPromise = api.get('/series/hero-featured', { signal: controller.signal })
+            .then((res) => {
+                if (!isCancelled) {
+                    setHeroFeatured(res.data || null);
+                }
+                return res.data;
+            })
+            .catch((err: any) => {
+                if (!isCancelled && err?.name !== 'AbortError' && err?.name !== 'CanceledError') {
+                    console.error("Failed to fetch hero featured series:", err);
+                    setHeroFeatured(null);
+                }
+                return null;
+            });
+
+        heroPromiseRef.current = heroPromise;
+
         const fetchCatalogRows = async () => {
             try {
-                const [allRes, wuxiaRes, homeSectionsRes] = await Promise.all([
-                    api.get('/series/?limit=40'),
-                    api.get('/series/?genre=Wuxia&limit=20'),
-                    api.get('/home/sections').catch(() => ({ data: [] })),
-                ]);
+                let sections: any[] = [];
+                try {
+                    const homeSectionsRes = await api.get('/home/sections', { signal: controller.signal });
+                    if (Array.isArray(homeSectionsRes.data)) {
+                        sections = homeSectionsRes.data;
+                    }
+                } catch (err: any) {
+                    if (err?.name !== 'AbortError' && err?.name !== 'CanceledError') {
+                        console.error("Failed to fetch home sections:", err);
+                    }
+                }
 
-                const allItems = formatSeries(allRes.data || []);
-                const shuffledTrending = [...allItems].sort(() => 0.5 - Math.random());
-                setTrending(shuffledTrending.slice(0, 18));
+                if (isCancelled) return;
 
-                const sortedNew = [...allItems].sort((a, b) => (b.release_year || 0) - (a.release_year || 0));
-                setNewReleases(sortedNew.slice(0, 18));
-                setWuxiaRow(formatSeries(wuxiaRes.data || []));
-                const sections = Array.isArray(homeSectionsRes.data) ? homeSectionsRes.data : [];
-                setHasManagedHome(sections.length > 0);
-                setManagedRows(sections.map((section: any) => ({
-                    id: section.id,
-                    title: section.title,
-                    items: formatSeries(section.items || []),
-                })));
-            } catch (error) {
-                console.error("Failed to fetch homepage catalog:", error);
+                if (sections.length > 0) {
+                    setHasManagedHome(true);
+                    setManagedRows(sections.map((section: any) => ({
+                        id: section.id,
+                        title: section.title,
+                        items: formatSeries(section.items || []),
+                    })));
+                } else {
+                    // Fetch catalog/wuxia only if sections empty or failed
+                    try {
+                        const [allRes, wuxiaRes] = await Promise.all([
+                            api.get('/series/?limit=40', { signal: controller.signal }),
+                            api.get('/series/?genre=Wuxia&limit=20', { signal: controller.signal }),
+                        ]);
+
+                        if (isCancelled) return;
+
+                        const allItems = formatSeries(allRes.data || []);
+                        const shuffledTrending = [...allItems].sort(() => 0.5 - Math.random());
+                        setTrending(shuffledTrending.slice(0, 18));
+
+                        const sortedNew = [...allItems].sort((a, b) => (b.release_year || 0) - (a.release_year || 0));
+                        setNewReleases(sortedNew.slice(0, 18));
+                        setWuxiaRow(formatSeries(wuxiaRes.data || []));
+                        setHasManagedHome(false);
+                    } catch (fallbackError: any) {
+                        if (fallbackError?.name !== 'AbortError' && fallbackError?.name !== 'CanceledError') {
+                            console.error("Fallback catalog fetch failed:", fallbackError);
+                        }
+                    }
+                }
+            } catch (error: any) {
+                if (error?.name !== 'AbortError' && error?.name !== 'CanceledError') {
+                    console.error("Failed to fetch homepage catalog:", error);
+                }
             } finally {
-                setLoading(false);
+                if (!isCancelled) {
+                    setLoading(false);
+                }
             }
         };
 
         fetchCatalogRows();
-        // The catalog rows are public and do not depend on list/profile changes.
-        // eslint-disable-next-line react-hooks/exhaustive-deps
+
+        return () => {
+            isCancelled = true;
+            controller.abort();
+            heroPromiseRef.current = null;
+        };
     }, []);
 
     useEffect(() => {
+        const controller = new AbortController();
+        let isCancelled = false;
+
         const fetchRecommendations = async () => {
             try {
                 let recData;
                 if (uid && currentProfile) {
                     const history = await getRecentlyWatched(uid, currentProfile.id, 40);
+                    if (isCancelled) return;
                     const watchedIds = [...new Set(history.map((h) => h.seriesId))];
                     recData = await getPersonalizedRecommendations({
                         watched_ids: watchedIds,
@@ -95,8 +155,10 @@ export default function Home() {
                         recent_series_id: watchedIds[0] ?? null,
                     });
                 } else {
-                    recData = (await api.get('/series/recommendations')).data;
+                    recData = (await api.get('/series/recommendations', { signal: controller.signal })).data;
                 }
+
+                if (isCancelled) return;
 
                 setIsPersonalized(recData.is_personalized || false);
                 setRecommended(formatSeries(recData.recommendations || []));
@@ -109,16 +171,25 @@ export default function Home() {
                 } else {
                     setBecauseYouWatched(null);
                 }
-            } catch (error) {
-                console.error("Failed to fetch homepage recommendations:", error);
+            } catch (error: any) {
+                if (error?.name !== 'AbortError' && error?.name !== 'CanceledError') {
+                    console.error("Failed to fetch homepage recommendations:", error);
+                }
             }
         };
 
         fetchRecommendations();
+
+        return () => {
+            isCancelled = true;
+            controller.abort();
+        };
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [uid, currentProfile?.id, myLikeIds, myListIds]);
 
     useEffect(() => {
+        let isCancelled = false;
+
         const fetchMyList = async () => {
             if (!isAuthenticated || !currentProfile || !uid) {
                 setMyListRow([]);
@@ -126,19 +197,26 @@ export default function Home() {
             }
             try {
                 const listData = await fetchMyListSeries(uid, currentProfile.id);
+                if (isCancelled) return;
                 setMyListRow(formatSeries(listData || []));
             } catch (err) {
-                console.error("Failed to fetch My List for homepage:", err);
-                setMyListRow([]);
+                if (!isCancelled) {
+                    console.error("Failed to fetch My List for homepage:", err);
+                    setMyListRow([]);
+                }
             }
         };
 
         fetchMyList();
-    }, [isAuthenticated, currentProfile?.id, myListIds]);
 
-    const handleOpenModal = (seriesItem: any) => {
+        return () => {
+            isCancelled = true;
+        };
+    }, [isAuthenticated, currentProfile, uid, myListIds]);
+
+    const handleOpenModal = useCallback((seriesItem: any) => {
         openModal(seriesItem);
-    };
+    }, [openModal]);
 
     if (loading) {
         return (
@@ -150,7 +228,7 @@ export default function Home() {
 
     return (
         <div className="min-h-screen pb-2 md:pb-20 overflow-x-hidden">
-            <Hero />
+            <Hero initialFeatured={heroFeatured} featuredPromise={heroPromiseRef.current} />
 
             <div className="relative z-10 mt-2 md:-mt-12 space-y-8 md:space-y-12">
                 {/* 0. Minha Lista (Exibido apenas se o usuário estiver logado e possuir conteúdos salvos) */}

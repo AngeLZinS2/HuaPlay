@@ -18,6 +18,7 @@ import EpisodeModal from '../components/admin/EpisodeModal';
 import EpisodeManager from '../components/admin/EpisodeManager';
 import DeleteConfirmModal from '../components/admin/DeleteConfirmModal';
 import FeaturedConfigModal from '../components/admin/FeaturedConfigModal';
+import HomePreviewModal from '../components/admin/HomePreviewModal';
 
 const ITEMS_PER_PAGE = 10;
 
@@ -76,6 +77,7 @@ export default function AdminSeries() {
     const [isEpisodeModalOpen, setIsEpisodeModalOpen] = useState(false);
     const [isEpisodeManagerOpen, setIsEpisodeManagerOpen] = useState(false);
     const [isFeaturedConfigOpen, setIsFeaturedConfigOpen] = useState(false);
+    const [homePreviewSeries, setHomePreviewSeries] = useState<any | undefined>(undefined);
     const [deleteTarget, setDeleteTarget] = useState<{ type: 'series' | 'episode'; id: number; name: string } | null>(null);
     const [saving, setSaving] = useState(false);
 
@@ -514,6 +516,7 @@ export default function AdminSeries() {
                 }}
                 handleToggleFeature={handleToggleFeature}
                 handleManageEpisodes={handleManageEpisodes}
+                handlePreview={setHomePreviewSeries}
                 setEpisodeData={setEpisodeData}
                 setActiveTab={() => {}}
                 setIsModalOpen={() => {}}
@@ -565,14 +568,20 @@ export default function AdminSeries() {
                 itemName={deleteTarget?.name}
                 message={
                     deleteTarget?.type === 'series'
-                        ? 'Isso excluirá permanentemente a série e todos os seus episódios.'
-                        : 'Esta ação removerá permanentemente o episódio.'
+                        ? 'A série e seus episódios serão enviados para a lixeira e poderão ser restaurados.'
+                        : 'O episódio será enviado para a lixeira e poderá ser restaurado.'
                 }
             />
 
             <FeaturedConfigModal
                 isOpen={isFeaturedConfigOpen}
                 onClose={() => setIsFeaturedConfigOpen(false)}
+            />
+            <HomePreviewModal
+                isOpen={homePreviewSeries !== undefined}
+                onClose={() => setHomePreviewSeries(undefined)}
+                seriesId={homePreviewSeries?.id}
+                seriesTitle={homePreviewSeries?.title}
             />
         </div>
     );

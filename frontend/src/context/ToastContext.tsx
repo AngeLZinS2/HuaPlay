@@ -1,4 +1,4 @@
-import { createContext, useContext, useState } from 'react';
+import { createContext, useContext, useState, useCallback, useMemo } from 'react';
 import type { ReactNode } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { X, CheckCircle, AlertCircle, Info } from 'lucide-react';
@@ -21,7 +21,11 @@ const ToastContext = createContext<ToastContextType | undefined>(undefined);
 export function ToastProvider({ children }: { children: ReactNode }) {
     const [toasts, setToasts] = useState<Toast[]>([]);
 
-    const addToast = (message: string, type: ToastType) => {
+    const removeToast = useCallback((id: string) => {
+        setToasts((prev) => prev.filter((toast) => toast.id !== id));
+    }, []);
+
+    const addToast = useCallback((message: string, type: ToastType) => {
         const id = Math.random().toString(36).substr(2, 9);
         setToasts((prev) => [...prev, { id, message, type }]);
 
@@ -29,14 +33,12 @@ export function ToastProvider({ children }: { children: ReactNode }) {
         setTimeout(() => {
             removeToast(id);
         }, 3000);
-    };
+    }, [removeToast]);
 
-    const removeToast = (id: string) => {
-        setToasts((prev) => prev.filter((toast) => toast.id !== id));
-    };
+    const value = useMemo(() => ({ addToast, removeToast }), [addToast, removeToast]);
 
     return (
-        <ToastContext.Provider value={{ addToast, removeToast }}>
+        <ToastContext.Provider value={value}>
             {children}
             <div className="fixed bottom-4 right-4 z-50 flex flex-col gap-2">
                 <AnimatePresence>

@@ -15,6 +15,14 @@ import {
     PanelsTopLeft,
     AlertTriangle,
     BarChart3,
+    Bell,
+    CalendarDays,
+    Images,
+    Download,
+    Tags,
+    ListVideo,
+    History,
+    Wrench,
 } from 'lucide-react';
 
 interface AdminLayoutProps {
@@ -24,10 +32,19 @@ interface AdminLayoutProps {
 const navItems = [
     { label: 'Visão Geral', icon: LayoutDashboard, path: '/admin' },
     { label: 'Séries', icon: Tv, path: '/admin/series' },
+    { label: 'Episódios', icon: ListVideo, path: '/admin/episodes' },
+    { label: 'Importar conteúdo', icon: Download, path: '/admin/import' },
+    { label: 'Gêneros', icon: Tags, path: '/admin/genres' },
     { label: 'Atores', icon: Users, path: '/admin/actors' },
     { label: 'Organizar Home', icon: PanelsTopLeft, path: '/admin/home' },
+    { label: 'Destaques PWA e APK', icon: Images, path: '/admin/highlights' },
+    { label: 'Calendário', icon: CalendarDays, path: '/admin/calendar' },
+    { label: 'Audiência', icon: BarChart3, path: '/admin/analytics' },
+    { label: 'Notificações', icon: Bell, path: '/admin/notifications' },
     { label: 'Pendências', icon: AlertTriangle, path: '/admin/health' },
     { label: 'Relatórios', icon: BarChart3, path: '/admin/reports' },
+    { label: 'Lixeira e histórico', icon: History, path: '/admin/history' },
+    { label: 'Manutenção', icon: Wrench, path: '/admin/maintenance' },
 ];
 
 export default function AdminLayout({ children }: AdminLayoutProps) {
@@ -59,7 +76,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
             </div>
 
             {/* Navigation */}
-            <nav className="flex-1 px-3 py-4 space-y-1">
+            <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-1">
                 {navItems.map((item) => (
                     <NavLink
                         key={item.path}

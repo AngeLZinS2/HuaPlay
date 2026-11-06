@@ -92,7 +92,7 @@ export default function ActorsTable({
                             >
                                 {/* Photo */}
                                 {actor.image_url ? (
-                                    <img src={actor.image_url} alt={actor.name} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" />
+                                    <img src={actor.image_url} alt={actor.name} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" loading="lazy" decoding="async" />
                                 ) : (
                                     <div className="w-full h-full flex items-center justify-center bg-white/5">
                                         <User className="w-10 h-10 text-gray-600" />
@@ -158,7 +158,7 @@ export default function ActorsTable({
                                     <td className="px-4 py-3">
                                         <div className="w-9 h-9 rounded-full overflow-hidden bg-gray-900 flex-shrink-0">
                                             {actor.image_url ? (
-                                                <img src={actor.image_url} alt="" className="w-full h-full object-cover" />
+                                                <img src={actor.image_url} alt="" className="w-full h-full object-cover" loading="lazy" decoding="async" />
                                             ) : (
                                                 <div className="w-full h-full flex items-center justify-center">
                                                     <User className="w-4 h-4 text-gray-600" />

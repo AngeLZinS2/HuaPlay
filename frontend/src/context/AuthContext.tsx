@@ -3,12 +3,14 @@ import {
     GoogleAuthProvider,
     createUserWithEmailAndPassword,
     onAuthStateChanged,
+    signInWithCredential,
     signInWithEmailAndPassword,
     signInWithPopup,
     signOut,
     updateProfile as updateAuthProfile,
     type User,
 } from 'firebase/auth';
+import { Capacitor } from '@capacitor/core';
 import { auth, googleProvider } from '../services/firebase';
 import { getBackendIdentity } from '../services/api';
 import {
@@ -151,12 +153,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
 
     const signInWithGoogle = async () => {
+        if (import.meta.env.MODE === 'mobile' && Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android') {
+            const { FirebaseAuthentication } = await import('@capacitor-firebase/authentication');
+            const result = await FirebaseAuthentication.signInWithGoogle({ skipNativeAuth: true });
+            const idToken = result.credential?.idToken;
+            if (!idToken) {
+                throw new Error('Google sign-in did not return an ID token.');
+            }
+            const credential = GoogleAuthProvider.credential(idToken);
+            const userCredential = await signInWithCredential(auth, credential);
+            await seedUserDoc(userCredential.user);
+            return;
+        }
+
         const result = await signInWithPopup(auth, googleProvider);
         GoogleAuthProvider.credentialFromResult(result);
         await seedUserDoc(result.user);
     };
 
     const logout = async () => {
+        if (import.meta.env.MODE === 'mobile' && Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android') {
+            try {
+                const { FirebaseAuthentication } = await import('@capacitor-firebase/authentication');
+                await FirebaseAuthentication.signOut();
+            } catch (err) {
+                console.warn('Native Google sign-out failed or ignored:', err);
+            }
+        }
         await signOut(auth);
     };
 

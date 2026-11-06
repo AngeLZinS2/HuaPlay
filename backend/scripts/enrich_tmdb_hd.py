@@ -9,6 +9,7 @@ Usage:
     python enrich_tmdb_hd.py [--limit N]
 """
 
+import os
 import re
 import sys
 import time
@@ -22,7 +23,7 @@ if sys.platform == "win32":
     sys.stderr.reconfigure(encoding='utf-8', errors='replace')
 
 DB_PATH = "weifansub.db"
-API_KEY = "8476a7ab80ad76f0936744df0430e67c"
+API_KEY = os.getenv("TMDB_API_KEY", "")
 
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) HuaPlay HD Enricher/1.0",

@@ -30,13 +30,16 @@ export function useHomeInactivityRedirect(enabled: boolean) {
         const scheduleRedirect = () => {
             window.clearTimeout(timeoutId);
             const elapsed = Date.now() - lastActivityAt;
-            const remaining = Math.max(0, DEFAULT_IDLE_TIMEOUT_MS - elapsed);
-            timeoutId = window.setTimeout(redirectToProfiles, remaining);
+            const remaining = DEFAULT_IDLE_TIMEOUT_MS - elapsed;
+            if (remaining <= 0) {
+                redirectToProfiles();
+                return;
+            }
+            timeoutId = window.setTimeout(scheduleRedirect, remaining);
         };
 
         const registerActivity = () => {
             lastActivityAt = Date.now();
-            scheduleRedirect();
         };
 
         const checkWhenVisible = () => {

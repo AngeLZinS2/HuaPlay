@@ -1,4 +1,4 @@
-import { createContext, useContext, useState } from 'react';
+import { createContext, useContext, useState, useCallback } from 'react';
 import type { ReactNode } from 'react';
 
 interface Series {
@@ -30,11 +30,11 @@ export function ModalProvider({ children }: { children: ReactNode }) {
     const [isOpen, setIsOpen] = useState(false);
     const [content, setContent] = useState<Series | null>(null);
 
-    const openModal = (series: Series) => {
+    const openModal = useCallback((series: Series) => {
         setContent(series);
         setIsOpen(true);
         document.body.style.overflow = 'hidden'; // Prevent background scrolling
-    };
+    }, []);
 
     const closeModal = () => {
         setIsOpen(false);

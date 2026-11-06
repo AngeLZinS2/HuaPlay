@@ -40,11 +40,41 @@ export default function Login() {
     useEffect(() => {
         if (banners.length === 0) return;
 
-        const interval = setInterval(() => {
-            setCurrentBannerIndex((prev) => (prev + 1) % banners.length);
-        }, 6000);
+        let interval: ReturnType<typeof setInterval> | null = null;
 
-        return () => clearInterval(interval);
+        const startInterval = () => {
+            if (interval === null) {
+                interval = setInterval(() => {
+                    setCurrentBannerIndex((prev) => (prev + 1) % banners.length);
+                }, 6000);
+            }
+        };
+
+        const stopInterval = () => {
+            if (interval !== null) {
+                clearInterval(interval);
+                interval = null;
+            }
+        };
+
+        const handleVisibilityChange = () => {
+            if (document.visibilityState === 'visible') {
+                startInterval();
+            } else {
+                stopInterval();
+            }
+        };
+
+        if (document.visibilityState === 'visible') {
+            startInterval();
+        }
+
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+
+        return () => {
+            stopInterval();
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
+        };
     }, [banners]);
 
     /** Firebase error codes are stable identifiers; map them to plain Portuguese. */

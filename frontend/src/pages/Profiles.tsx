@@ -54,8 +54,42 @@ export default function Profiles() {
 
     useEffect(() => {
         if (backgrounds.length < 2) return;
-        const timer = window.setInterval(() => setActiveBackground(current => (current + 1) % backgrounds.length), 7500);
-        return () => window.clearInterval(timer);
+
+        let timer: number | null = null;
+
+        const startTimer = () => {
+            if (timer === null) {
+                timer = window.setInterval(() => {
+                    setActiveBackground((current) => (current + 1) % backgrounds.length);
+                }, 7500);
+            }
+        };
+
+        const stopTimer = () => {
+            if (timer !== null) {
+                window.clearInterval(timer);
+                timer = null;
+            }
+        };
+
+        const handleVisibilityChange = () => {
+            if (document.visibilityState === 'visible') {
+                startTimer();
+            } else {
+                stopTimer();
+            }
+        };
+
+        if (document.visibilityState === 'visible') {
+            startTimer();
+        }
+
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+
+        return () => {
+            stopTimer();
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
+        };
     }, [backgrounds]);
 
     const handleSelectProfile = (profile: any) => {

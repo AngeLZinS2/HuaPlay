@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { useParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Play, Download, Star, Share2, Check, History, AlertTriangle, X } from 'lucide-react';
@@ -169,17 +169,23 @@ export default function SeriesDetail() {
     };
 
     // Most recently touched episode of this series, for the resume banner.
-    const lastWatched = Object.values(progress).sort((a, b) =>
-        (b.updatedAt?.toMillis() ?? 0) - (a.updatedAt?.toMillis() ?? 0),
-    )[0];
+    const lastWatched = useMemo(() => {
+        return Object.values(progress).sort((a, b) =>
+            (b.updatedAt?.toMillis() ?? 0) - (a.updatedAt?.toMillis() ?? 0),
+        )[0];
+    }, [progress]);
 
     // Seasons of one show used to be separate series records; they are now one
     // record with season_number on each episode. 0 is reserved for specials.
-    const seasons = [...new Set(episodes.map((e) => e.season_number ?? 1))].sort(
-        (a, b) => (a === 0 ? 1 : b === 0 ? -1 : 0) || a - b,
-    );
+    const seasons = useMemo(() => {
+        return [...new Set(episodes.map((e) => e.season_number ?? 1))].sort(
+            (a, b) => (a === 0 ? 1 : b === 0 ? -1 : 0) || a - b,
+        );
+    }, [episodes]);
     const activeSeason = selectedSeason ?? seasons[0] ?? 1;
-    const visibleEpisodes = episodes.filter((e) => (e.season_number ?? 1) === activeSeason);
+    const visibleEpisodes = useMemo(() => {
+        return episodes.filter((e) => (e.season_number ?? 1) === activeSeason);
+    }, [episodes, activeSeason]);
     const seasonLabel = (n: number) => (n === 0 ? 'Especiais' : `Temporada ${n}`);
 
     // Resume where the viewer stopped. YouTube honours ?start=; other providers

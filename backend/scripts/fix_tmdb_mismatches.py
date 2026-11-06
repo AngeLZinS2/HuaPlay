@@ -33,7 +33,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 import requests
 
-API_KEY = os.getenv("TMDB_API_KEY", "8476a7ab80ad76f0936744df0430e67c")
+API_KEY = os.getenv("TMDB_API_KEY", "")
 DB_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "weifansub.db")
 
 ASIAN = {"CN", "KR", "JP", "TH", "TW", "HK", "PH", "VN", "ID", "SG", "MY", "MO"}

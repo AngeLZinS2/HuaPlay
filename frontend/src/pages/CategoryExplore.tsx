@@ -129,6 +129,7 @@ export default function CategoryExplore() {
 
     // Filters state
     const [searchQuery, setSearchQuery] = useState('');
+    const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
     const [selectedType, setSelectedType] = useState<string>(meta.defaultType || 'All');
     const [selectedCountry, setSelectedCountry] = useState<string>(meta.defaultCountry || 'All');
     const [selectedStatus, setSelectedStatus] = useState<string>(meta.defaultStatus || 'All');
@@ -139,6 +140,14 @@ export default function CategoryExplore() {
     const [page, setPage] = useState<number>(1);
     const LIMIT = 36;
 
+    // Debounce search query changes by 300ms
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            setDebouncedSearchQuery(searchQuery);
+        }, 300);
+        return () => clearTimeout(timer);
+    }, [searchQuery]);
+
     // Reset filters when route changes
     useEffect(() => {
         setSelectedType(meta.defaultType || 'All');
@@ -146,12 +155,14 @@ export default function CategoryExplore() {
         setSelectedStatus(meta.defaultStatus || 'All');
         setSelectedGenre(meta.defaultGenre || 'All');
         setSearchQuery('');
+        setDebouncedSearchQuery('');
         setPage(1);
     }, [meta]);
 
     // Fetch items from backend API
     useEffect(() => {
         let isMounted = true;
+        const controller = new AbortController();
         setLoading(true);
 
         const params: any = {
@@ -159,25 +170,33 @@ export default function CategoryExplore() {
             limit: LIMIT,
         };
 
-        if (searchQuery.trim()) params.search = searchQuery.trim();
+        if (debouncedSearchQuery.trim()) params.search = debouncedSearchQuery.trim();
         if (selectedType !== 'All') params.type = selectedType;
         if (selectedCountry !== 'All') params.country = selectedCountry;
         if (selectedStatus !== 'All') params.status = selectedStatus;
         if (selectedGenre !== 'All') params.genre = selectedGenre;
 
-        getSeries(params)
+        getSeries(params, controller.signal)
             .then((data: any) => {
                 if (!isMounted) return;
                 setItems(data);
                 setLoading(false);
             })
             .catch((err: any) => {
-                console.error('Error fetching filtered series:', err);
-                if (isMounted) setLoading(false);
+                if (err?.name === 'CanceledError' || err?.name === 'AbortError' || err?.code === 'ERR_CANCELED') {
+                    return;
+                }
+                if (isMounted) {
+                    console.error('Error fetching filtered series:', err);
+                    setLoading(false);
+                }
             });
 
-        return () => { isMounted = false; };
-    }, [selectedType, selectedCountry, selectedStatus, selectedGenre, searchQuery, page]);
+        return () => {
+            isMounted = false;
+            controller.abort();
+        };
+    }, [selectedType, selectedCountry, selectedStatus, selectedGenre, debouncedSearchQuery, page]);
 
     const hasActiveFilters = selectedType !== 'All' || selectedCountry !== 'All' || selectedStatus !== 'All' || selectedGenre !== 'All' || searchQuery !== '';
 
@@ -187,6 +206,7 @@ export default function CategoryExplore() {
         setSelectedStatus('All');
         setSelectedGenre('All');
         setSearchQuery('');
+        setDebouncedSearchQuery('');
         setPage(1);
     };
 

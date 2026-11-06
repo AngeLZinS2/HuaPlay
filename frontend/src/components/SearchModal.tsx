@@ -20,8 +20,9 @@ export default function SearchModal({ isOpen, onClose }: SearchModalProps) {
 
     // Focus input when modal opens
     useEffect(() => {
+        let focusTimer: ReturnType<typeof setTimeout> | undefined;
         if (isOpen) {
-            setTimeout(() => {
+            focusTimer = setTimeout(() => {
                 inputRef.current?.focus();
             }, 100);
             document.body.style.overflow = 'hidden';
@@ -29,32 +30,63 @@ export default function SearchModal({ isOpen, onClose }: SearchModalProps) {
             document.body.style.overflow = 'unset';
             setQuery('');
             setResults([]);
+            setLoading(false);
         }
         return () => {
+            if (focusTimer) clearTimeout(focusTimer);
             document.body.style.overflow = 'unset';
         };
     }, [isOpen]);
 
     // Debounced search
     useEffect(() => {
+        if (!isOpen) {
+            setResults([]);
+            setLoading(false);
+            return;
+        }
+
+        const trimmed = query.trim();
+        if (!trimmed) {
+            setResults([]);
+            setLoading(false);
+            return;
+        }
+
+        let isCurrent = true;
+        let controller: AbortController | null = null;
+
         const timer = setTimeout(async () => {
-            if (query.trim()) {
-                setLoading(true);
-                try {
-                    const data = await getSeries({ search: query, limit: 20 });
+            controller = new AbortController();
+            setLoading(true);
+            try {
+                const data = await getSeries({ search: trimmed, limit: 20 }, controller.signal);
+                if (isCurrent) {
                     setResults(data);
-                } catch (error) {
+                }
+            } catch (error: unknown) {
+                const err = error as { name?: string; code?: string };
+                if (err?.name === 'CanceledError' || err?.name === 'AbortError' || err?.code === 'ERR_CANCELED') {
+                    return;
+                }
+                if (isCurrent) {
                     console.error('Error searching series:', error);
-                } finally {
+                }
+            } finally {
+                if (isCurrent) {
                     setLoading(false);
                 }
-            } else {
-                setResults([]);
             }
         }, 300);
 
-        return () => clearTimeout(timer);
-    }, [query]);
+        return () => {
+            isCurrent = false;
+            clearTimeout(timer);
+            if (controller) {
+                controller.abort();
+            }
+        };
+    }, [query, isOpen]);
 
     return (
         <AnimatePresence>
@@ -128,6 +160,8 @@ export default function SearchModal({ isOpen, onClose }: SearchModalProps) {
                                                             <img
                                                                 src={getOptimizedImageUrl(series.cover_image, 'thumbnail')}
                                                                 alt={series.title}
+                                                                loading="lazy"
+                                                                decoding="async"
                                                                 className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
                                                             />
                                                         </div>

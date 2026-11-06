@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Edit, Trash2, Star, List, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Edit, Trash2, Star, List, ChevronLeft, ChevronRight, MonitorPlay } from 'lucide-react';
 import { getOptimizedImageUrl } from '../../utils/image';
 
 interface SeriesTableProps {
@@ -13,6 +13,7 @@ interface SeriesTableProps {
     handleDelete: (id: number) => void;
     handleToggleFeature: (id: number) => void;
     handleManageEpisodes: (item: any) => void;
+    handlePreview: (item: any) => void;
     setEpisodeData: (data: any) => void;
     setActiveTab: (tab: any) => void;
     setIsModalOpen: (isOpen: boolean) => void;
@@ -43,6 +44,7 @@ export default function SeriesTable({
     handleDelete,
     handleToggleFeature,
     handleManageEpisodes,
+    handlePreview,
     itemsPerPage,
     totalItems,
 }: SeriesTableProps) {
@@ -114,7 +116,7 @@ export default function SeriesTable({
                                                 }}
                                                 onMouseLeave={() => setHoveredCover(null)}
                                             >
-                                                <img src={getOptimizedImageUrl(item.cover_image, 'thumbnail')} alt="" className="w-full h-full object-cover" />
+                                                <img src={getOptimizedImageUrl(item.cover_image, 'thumbnail')} alt="" className="w-full h-full object-cover" loading="lazy" decoding="async" />
                                             </div>
                                         </td>
 
@@ -162,6 +164,13 @@ export default function SeriesTable({
                                         {/* Actions */}
                                         <td className="px-4 py-3">
                                             <div className="flex items-center gap-1 justify-end">
+                                                <button
+                                                    onClick={() => handlePreview(item)}
+                                                    title="Prévia na Home"
+                                                    className="p-1.5 rounded-lg text-gray-600 hover:text-cyan-400 hover:bg-cyan-400/10 transition-all"
+                                                >
+                                                    <MonitorPlay className="w-3.5 h-3.5" />
+                                                </button>
                                                 <button
                                                     onClick={() => handleToggleFeature(item.id)}
                                                     title={item.is_featured ? 'Remover destaque' : 'Destacar'}
@@ -226,7 +235,7 @@ export default function SeriesTable({
                         animate={{ opacity: 1, scale: 1 }}
                         className="w-24 h-32 rounded-xl overflow-hidden border border-white/10 shadow-2xl shadow-black"
                     >
-                        <img src={hoveredCover.url} alt="" className="w-full h-full object-cover" />
+                        <img src={hoveredCover.url} alt="" className="w-full h-full object-cover" decoding="async" />
                     </motion.div>
                 </div>
             )}

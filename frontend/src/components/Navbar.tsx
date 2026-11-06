@@ -56,11 +56,34 @@ export default function Navbar() {
     const [isSearchOpen, setIsSearchOpen] = useState(false);
 
     useEffect(() => {
-        const handleScroll = () => {
-            setIsScrolled(window.scrollY > 0);
+        let rafId: number | null = null;
+        let lastScrolled = window.scrollY > 0;
+
+        setIsScrolled(lastScrolled);
+
+        const updateScroll = () => {
+            rafId = null;
+            const nextScrolled = window.scrollY > 0;
+            if (nextScrolled !== lastScrolled) {
+                lastScrolled = nextScrolled;
+                setIsScrolled(nextScrolled);
+            }
         };
-        window.addEventListener('scroll', handleScroll);
-        return () => window.removeEventListener('scroll', handleScroll);
+
+        const handleScroll = () => {
+            if (rafId === null) {
+                rafId = window.requestAnimationFrame(updateScroll);
+            }
+        };
+
+        window.addEventListener('scroll', handleScroll, { passive: true });
+
+        return () => {
+            window.removeEventListener('scroll', handleScroll);
+            if (rafId !== null) {
+                window.cancelAnimationFrame(rafId);
+            }
+        };
     }, []);
 
     const location = useLocation();
@@ -72,7 +95,7 @@ export default function Navbar() {
 
     return (
         <nav
-            className={`fixed top-0 w-full z-50 transition-colors duration-300 ${isScrolled ? 'bg-background/95 backdrop-blur-sm shadow-md' : 'bg-transparent'
+            className={`fixed top-0 w-full z-50 pt-[env(safe-area-inset-top,0px)] transition-colors duration-300 ${isScrolled ? 'bg-background/95 backdrop-blur-sm shadow-md' : 'bg-transparent'
                 }`}
         >
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -343,7 +366,7 @@ export default function Navbar() {
                         transition={{ type: 'spring', damping: 25, stiffness: 200 }}
                         className="fixed inset-0 z-[60] md:hidden bg-black/95 backdrop-blur-xl h-[100dvh] overflow-y-auto"
                     >
-                        <div className="flex flex-col pt-6 px-6 space-y-6 pb-32">
+                        <div className="flex flex-col pt-[calc(1.5rem+env(safe-area-inset-top,0px))] px-6 space-y-6 pb-32">
                             <div className="flex justify-between items-center mb-8 h-14">
                                 <span className="text-xl font-display font-bold text-primary">MENU</span>
                                 <button

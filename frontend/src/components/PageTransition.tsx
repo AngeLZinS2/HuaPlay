@@ -1,4 +1,5 @@
 import { motion } from 'framer-motion';
+import { useLayoutEffect } from 'react';
 import type { ReactNode } from 'react';
 
 interface PageTransitionProps {
@@ -12,6 +13,14 @@ const pageVariants = {
 };
 
 export default function PageTransition({ children }: PageTransitionProps) {
+    useLayoutEffect(() => {
+        // Reset only when the destination mounts, after the previous page exits.
+        // Let links with a fragment keep their intended anchor position.
+        if (!window.location.hash) {
+            window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+        }
+    }, []);
+
     return (
         <motion.div
             initial="initial"
