@@ -1,12 +1,10 @@
 {
-  "versionCode": 5,
-  "versionName": "1.0.4",
-  "apkUrl": "https://huaplay.playdb.info/downloads/huaplay/HuaPlay-1.0.4.apk",
-  "sha256": "6f6cd1668e5baa70713b76e186a1d0082b40537b880e0bd4e0b17a44fe67b14b",
+  "versionCode": 6,
+  "versionName": "1.0.5",
+  "apkUrl": "https://huaplay.playdb.info/downloads/huaplay/HuaPlay-1.0.5.apk",
+  "sha256": "7e325815c34d7279b1df61ac0d44fb393d76194d0f863b3f937b22695285b8f2",
   "releaseNotes": [
-    "Notificações push em segundo plano e avisos in-app no site e app nativo",
-    "Agendamento de notificações com envio sincronizado e fuso horário UTC",
-    "Melhorias no ciclo de vida e estabilidade do registro push nativo",
-    "Ativação opcional de alertas e central de avisos com contador de não lidas"
+    "Correcao do fechamento ao iniciar no Android",
+    "Preservacao dos metadados de permissoes de notificacoes no APK otimizado"
   ]
 }
