@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import SearchModal from './SearchModal';
 import { useAuth } from '../context/AuthContext';
 import LanguageSwitcher from './LanguageSwitcher';
+import NotificationBell from './NotificationBell';
 
 const navigation = [
     { name: 'CRONOGRAMA', href: '/schedule' },
@@ -169,6 +170,7 @@ export default function Navbar() {
                         >
                             <Search className="w-5 h-5" />
                         </button>
+                        <NotificationBell />
                         {/* User Profile Dropdown */}
                         {isAuthenticated ? (
                             <div
@@ -266,7 +268,8 @@ export default function Navbar() {
                     </div>
 
                     {/* Mobile Icons & Menu */}
-                    <div className="md:hidden flex items-center gap-4">
+                    <div className="md:hidden flex items-center gap-3">
+                        <NotificationBell />
                         <button
                             className="text-gray-300 hover:text-white transition-colors"
                             onClick={() => setIsSearchOpen(true)}

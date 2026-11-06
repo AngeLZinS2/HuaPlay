@@ -4,10 +4,10 @@
 :: Requires: JDK 21, Android SDK, Node.js
 :: ================================================================
 
-echo [1/4] Building React frontend...
+echo [1/4] Building React frontend (mobile mode)...
 cd /d "%~dp0frontend"
-call npm run build
-if %ERRORLEVEL% NEQ 0 ( echo BUILD FAILED at npm run build & pause & exit /b 1 )
+call npm run build:mobile
+if %ERRORLEVEL% NEQ 0 ( echo BUILD FAILED at npm run build:mobile & pause & exit /b 1 )
 
 echo [2/4] Syncing assets to Android project...
 call npx cap sync android
@@ -15,9 +15,11 @@ if %ERRORLEVEL% NEQ 0 ( echo BUILD FAILED at cap sync & pause & exit /b 1 )
 
 echo [3/4] Compiling Android APK with Gradle...
 cd android
-set JAVA_HOME=C:\Program Files\Microsoft\jdk-21.0.12.8-hotspot
-set ANDROID_HOME=%LOCALAPPDATA%\Android\Sdk
-set PATH=%JAVA_HOME%\bin;%ANDROID_HOME%\platform-tools;%ANDROID_HOME%\build-tools\36.0.0;%PATH%
+if defined JAVA_HOME set "PATH=%JAVA_HOME%\bin;%PATH%"
+if not defined ANDROID_HOME (
+    if exist "%LOCALAPPDATA%\Android\Sdk" set "ANDROID_HOME=%LOCALAPPDATA%\Android\Sdk"
+)
+if defined ANDROID_HOME set "PATH=%ANDROID_HOME%\platform-tools;%ANDROID_HOME%\build-tools\36.0.0;%PATH%"
 
 call gradlew.bat assembleDebug
 if %ERRORLEVEL% NEQ 0 ( echo BUILD FAILED at Gradle & pause & exit /b 1 )

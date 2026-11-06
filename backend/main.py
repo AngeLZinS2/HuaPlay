@@ -1,10 +1,12 @@
+from contextlib import asynccontextmanager
 from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import inspect, text
 
 from auth import FirebaseUser, get_current_admin, get_current_user
 from database import Base, engine
-from routers import actors, series, admin, admin_suite
+from fcm_service import start_push_worker, stop_push_worker
+from routers import actors, series, admin, admin_suite, notifications
 
 # Create tables
 Base.metadata.create_all(bind=engine)
@@ -22,6 +24,18 @@ def ensure_admin_columns() -> None:
             "publication_status": "VARCHAR NOT NULL DEFAULT 'published'",
             "scheduled_at": "DATETIME",
         },
+        "admin_notifications": {
+            "push_status": "VARCHAR NOT NULL DEFAULT 'not_requested'",
+            "push_error": "TEXT",
+            "push_sent_count": "INTEGER NOT NULL DEFAULT 0",
+            "push_failed_count": "INTEGER NOT NULL DEFAULT 0",
+            "retry_count": "INTEGER NOT NULL DEFAULT 0",
+            "max_retries": "INTEGER NOT NULL DEFAULT 3",
+            "next_retry_at": "DATETIME",
+            "claimed_at": "DATETIME",
+            "claimed_by": "VARCHAR",
+            "updated_at": "DATETIME",
+        },
     }
     with engine.begin() as connection:
         for table_name, columns in additions.items():
@@ -37,7 +51,16 @@ def ensure_admin_columns() -> None:
 
 ensure_admin_columns()
 
-app = FastAPI(title="HuaPlay Catalog API", version="0.2.0")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Lifecycle-managed background polling worker
+    start_push_worker()
+    yield
+    await stop_push_worker()
+
+
+app = FastAPI(title="HuaPlay Catalog API", version="0.2.0", lifespan=lifespan)
 
 # CORS setup
 origins = [
@@ -58,6 +81,7 @@ app.include_router(series.router)
 app.include_router(actors.router)
 app.include_router(admin.public_router)
 app.include_router(admin_suite.public_router)
+app.include_router(notifications.router)
 
 # Content writes. The guard lives on the include, not on each route, so a new
 # endpoint added to an admin_router cannot ship unprotected by accident.

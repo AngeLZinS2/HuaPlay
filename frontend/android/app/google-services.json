@@ -1,0 +1,55 @@
+{
+  "project_info": {
+    "project_number": "310696387200",
+    "project_id": "gtavi-6991d",
+    "storage_bucket": "gtavi-6991d.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:310696387200:android:b16ded1a648b10c5bbfc65",
+        "android_client_info": {
+          "package_name": "com.huaplay.app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "310696387200-8o3cdbbphn5rkkr43k3icoovje8772le.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.huaplay.app",
+            "certificate_hash": "b308c5ce79fdc6481c94a57f808ef3492a748974"
+          }
+        },
+        {
+          "client_id": "310696387200-tmn0g7qlgk0ag0rdq1cgeafaalb6ad58.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.huaplay.app",
+            "certificate_hash": "393121a33aecd6f8309b19ee1bc921c2a7e45fca"
+          }
+        },
+        {
+          "client_id": "310696387200-qsu14f126m63r6uvdh3sl0k86lu6ieb4.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDA-urrG8deQHv_ZmgZb9diw0KR1h2wdNU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "310696387200-qsu14f126m63r6uvdh3sl0k86lu6ieb4.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

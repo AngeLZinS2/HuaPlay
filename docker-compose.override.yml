@@ -1,0 +1,11 @@
+services:
+  frontend:
+    networks:
+      - default
+      - playdb-proxy
+
+networks:
+  default:
+  playdb-proxy:
+    external: true
+    name: playdb_playdb_network

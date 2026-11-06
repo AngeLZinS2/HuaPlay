@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, DateTime, Text, func, Index
+from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, DateTime, Text, func, Index, UniqueConstraint
 from sqlalchemy.orm import relationship
 from datetime import datetime
 from database import Base
@@ -243,11 +243,63 @@ class AdminNotification(Base):
     message = Column(Text, nullable=False)
     image_url = Column(String, nullable=True)
     action_url = Column(String, nullable=True)
-    audience = Column(String, nullable=False, default="all")
-    status = Column(String, nullable=False, default="draft")
+    audience = Column(String, nullable=False, default="all") # "all", "web", "android"
+    status = Column(String, nullable=False, default="draft") # "draft", "scheduled", "published", "cancelled"
     scheduled_at = Column(DateTime(timezone=True), nullable=True)
     sent_at = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+    # Push delivery state & audit
+    push_status = Column(String, nullable=False, default="not_requested") # "not_requested", "pending_credentials", "pending", "processing", "sent", "partial_failure", "failed", "skipped_no_tokens", "cancelled"
+    push_error = Column(Text, nullable=True)
+    push_sent_count = Column(Integer, nullable=False, default=0)
+    push_failed_count = Column(Integer, nullable=False, default=0)
+    retry_count = Column(Integer, nullable=False, default=0)
+    max_retries = Column(Integer, nullable=False, default=3)
+    next_retry_at = Column(DateTime(timezone=True), nullable=True)
+
+    # Concurrency claim for background worker execution
+    claimed_at = Column(DateTime(timezone=True), nullable=True)
+    claimed_by = Column(String, nullable=True)
+
+    delivery_recipients = relationship("PushDeliveryRecipient", cascade="all, delete-orphan", backref="notification")
+
+
+class PushDeviceToken(Base):
+    __tablename__ = "push_device_tokens"
+    __table_args__ = (
+        Index("ix_push_device_tokens_user_platform", "user_id", "platform"),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(String, nullable=False, index=True)
+    token = Column(String, nullable=False, unique=True, index=True)
+    platform = Column(String, nullable=False, default="web", index=True) # "web" or "android"
+    is_active = Column(Boolean, nullable=False, default=True, index=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    last_seen_at = Column(DateTime(timezone=True), nullable=True)
+
+
+class PushDeliveryRecipient(Base):
+    __tablename__ = "push_delivery_recipients"
+    __table_args__ = (
+        UniqueConstraint("notification_id", "token_id", name="uq_notification_recipient"),
+        Index("ix_push_delivery_recipients_notif_status", "notification_id", "status"),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    notification_id = Column(Integer, ForeignKey("admin_notifications.id", ondelete="CASCADE"), nullable=False)
+    token_id = Column(Integer, ForeignKey("push_device_tokens.id", ondelete="CASCADE"), nullable=False)
+    status = Column(String, nullable=False, default="pending")  # "pending", "sent", "failed"
+    error_message = Column(Text, nullable=True)
+    attempt_count = Column(Integer, nullable=False, default=0)
+    sent_at = Column(DateTime(timezone=True), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+    device_token = relationship("PushDeviceToken")
 
 
 class SearchEvent(Base):

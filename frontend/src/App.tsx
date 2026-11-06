@@ -1,6 +1,7 @@
 import { Routes, Route, useLocation, useNavigate } from 'react-router-dom';
 import { AnimatePresence } from 'framer-motion';
 import { ModalProvider } from './context/ModalContext';
+import { NotificationProvider } from './context/NotificationContext';
 import { useAuth } from './context/AuthContext';
 import { lazy, Suspense, use, useEffect, type ComponentType, type ReactNode } from 'react';
 import { Capacitor } from '@capacitor/core';
@@ -101,14 +102,16 @@ function PageLoading() {
 function PublicLayout({ children }: { children: React.ReactNode }) {
   return (
     <ModalProvider>
-      <div className="min-h-screen flex flex-col font-sans bg-background text-white">
-        <Navbar />
-        <main className="flex-grow">{children}</main>
-        <Footer />
-        <MobileBottomNav />
-        <ShakeToReport />
-        <SeriesDetailsModal />
-      </div>
+      <NotificationProvider>
+        <div className="min-h-screen flex flex-col font-sans bg-background text-white">
+          <Navbar />
+          <main className="flex-grow">{children}</main>
+          <Footer />
+          <MobileBottomNav />
+          <ShakeToReport />
+          <SeriesDetailsModal />
+        </div>
+      </NotificationProvider>
     </ModalProvider>
   );
 }

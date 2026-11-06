@@ -1,23 +1,19 @@
-import { CapacitorConfig } from '@capacitor/cli';
+/// <reference types="@capacitor-firebase/authentication" />
+import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
   appId: 'com.huaplay.app',
   appName: 'HuaPlay',
-  webDir: 'dist',
+  webDir: 'dist-mobile',
   server: {
-    // For local network development (PC and phone on same Wi-Fi)
-    // Change to your production URL before distributing
-    // url: 'https://your-production-server.com',
     androidScheme: 'https',
-    cleartext: true, // Allow HTTP for local dev backend
-    // Hostname override helps MIUI/ColorOS avoid treating the app as a browser
     hostname: 'huaplay.app',
   },
   android: {
     backgroundColor: '#000000',
-    allowMixedContent: true,       // Allow HTTP + HTTPS (needed for local dev)
+    allowMixedContent: false,
     captureInput: true,
-    webContentsDebuggingEnabled: false, // Disable in production for security
+    webContentsDebuggingEnabled: false,
     // Prevent MIUI/ColorOS battery saver from throttling the WebView
     initialFocus: true,
     // Use hardware-accelerated renderer
@@ -34,6 +30,10 @@ const config: CapacitorConfig = {
       // Prevent white flash during splash (MIUI/ColorOS issue)
       splashFullScreen: true,
       splashImmersive: true,
+    },
+    FirebaseAuthentication: {
+      skipNativeAuth: true,
+      providers: ['google.com'],
     },
   },
 };

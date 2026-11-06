@@ -20,6 +20,12 @@ import {
     listOrCreateProfiles,
     type UserProfile,
 } from '../services/userData';
+import {
+    getStoredDeviceToken,
+    setStoredDeviceToken,
+    setStoredOptIn,
+    unsubscribeDeviceToken,
+} from '../services/notifications';
 
 interface AuthContextType {
     user: User | null;
@@ -172,6 +178,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
 
     const logout = async () => {
+        const storedToken = getStoredDeviceToken();
+        if (storedToken) {
+            try {
+                await unsubscribeDeviceToken(storedToken);
+            } catch (err) {
+                console.warn('Failed to unsubscribe device token on logout:', err);
+            }
+            setStoredDeviceToken(null);
+            if (uid) setStoredOptIn(false, uid);
+        }
+
         if (import.meta.env.MODE === 'mobile' && Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android') {
             try {
                 const { FirebaseAuthentication } = await import('@capacitor-firebase/authentication');

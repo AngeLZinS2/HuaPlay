@@ -442,43 +442,147 @@ def record_search(data: SearchEventIn, db: Session = Depends(get_db)):
 
 
 class NotificationIn(BaseModel):
-    title: str
-    message: str
-    image_url: Optional[str] = None
-    action_url: Optional[str] = None
-    audience: str = "all"
-    status: Literal["draft", "scheduled", "sent", "cancelled"] = "draft"
+    title: str = Field(..., min_length=1, max_length=150)
+    message: str = Field(..., min_length=1, max_length=1000)
+    image_url: Optional[str] = Field(None, max_length=500)
+    action_url: Optional[str] = Field(None, max_length=500)
+    audience: Literal["all", "web", "android"] = "all"
+    status: Literal["draft", "scheduled", "published", "sent", "cancelled"] = "draft"
     scheduled_at: Optional[datetime] = None
     send_now: bool = False
 
 
+@admin_router.get("/notifications/push-config-status")
+def get_push_status():
+    from fcm_service import get_fcm_config_status
+    return get_fcm_config_status()
+
+
 @admin_router.get("/notifications")
-def list_notifications(db: Session = Depends(get_db)): return db.query(models.AdminNotification).order_by(models.AdminNotification.id.desc()).all()
+def list_notifications(db: Session = Depends(get_db)):
+    return db.query(models.AdminNotification).order_by(models.AdminNotification.id.desc()).all()
 
 
 @admin_router.post("/notifications", status_code=201)
 def create_notification(data: NotificationIn, db: Session = Depends(get_db)):
+    now = datetime.now(timezone.utc)
     values = data.model_dump(exclude={"send_now"})
-    if data.send_now: values.update(status="sent", sent_at=datetime.now(timezone.utc))
-    elif data.scheduled_at: values["status"] = "scheduled"
-    row = models.AdminNotification(**values); db.add(row); db.flush(); audit(db, "create", "notification", row.id); db.commit(); db.refresh(row); return row
+    if data.send_now:
+        values.update(
+            status="published",
+            sent_at=now,
+            push_status="pending",
+            retry_count=0,
+            next_retry_at=None,
+        )
+    elif data.scheduled_at:
+        values["status"] = "scheduled"
+        values["push_status"] = "pending"
+        values["retry_count"] = 0
+    else:
+        values["status"] = "draft"
+        values["push_status"] = "not_requested"
+
+    row = models.AdminNotification(**values)
+    db.add(row)
+    db.flush()
+    audit(db, "create", "notification", row.id)
+    db.commit()
+    db.refresh(row)
+    return row
 
 
 @admin_router.patch("/notifications/{item_id}")
 @admin_router.put("/notifications/{item_id}")
 def update_notification(item_id: int, data: NotificationIn, db: Session = Depends(get_db)):
     row = db.get(models.AdminNotification, item_id)
-    if not row: raise HTTPException(404, "Notificação não encontrada")
-    for k, v in data.model_dump(exclude={"send_now"}).items(): setattr(row, k, v)
-    if row.status == "sent" and not row.sent_at: row.sent_at = datetime.now(timezone.utc)
-    audit(db, "update", "notification", row.id); db.commit(); db.refresh(row); return row
+    if not row:
+        raise HTTPException(404, "Notificação não encontrada")
+
+    now = datetime.now(timezone.utc)
+    was_published_or_sent = row.status in ("published", "sent")
+
+    update_data = data.model_dump(exclude={"send_now"})
+    for k, v in update_data.items():
+        setattr(row, k, v)
+
+    if data.send_now:
+        row.status = "published"
+        row.sent_at = now
+        row.push_status = "pending"
+        row.push_error = None
+        row.retry_count = 0
+        row.next_retry_at = None
+        row.claimed_at = None
+        row.claimed_by = None
+    elif data.scheduled_at and row.status == "scheduled":
+        pass
+    elif row.status == "cancelled":
+        row.push_status = "cancelled"
+        row.claimed_at = None
+        row.claimed_by = None
+    elif was_published_or_sent:
+        # Simple edit: preserve sent_at, push_status, retry counts to prevent duplicate broadcasts
+        pass
+
+    row.updated_at = now
+    audit(db, "update", "notification", row.id)
+    db.commit()
+    db.refresh(row)
+    return row
+
+
+@admin_router.post("/notifications/{item_id}/dispatch-now")
+def dispatch_notification_now(item_id: int, db: Session = Depends(get_db)):
+    """Trigger immediate publishing and background push attempt."""
+    row = db.get(models.AdminNotification, item_id)
+    if not row:
+        raise HTTPException(404, "Notificação não encontrada")
+
+    now = datetime.now(timezone.utc)
+    row.status = "published"
+    row.sent_at = now
+    row.push_status = "pending"
+    row.push_error = None
+    row.retry_count = 0
+    row.next_retry_at = None
+    row.claimed_at = None
+    row.claimed_by = None
+    row.updated_at = now
+
+    audit(db, "dispatch_now", "notification", row.id)
+    db.commit()
+    db.refresh(row)
+    return row
+
+
+@admin_router.post("/notifications/{item_id}/cancel")
+def cancel_notification(item_id: int, db: Session = Depends(get_db)):
+    """Cancel a scheduled or draft notification."""
+    row = db.get(models.AdminNotification, item_id)
+    if not row:
+        raise HTTPException(404, "Notificação não encontrada")
+
+    row.status = "cancelled"
+    row.push_status = "cancelled"
+    row.claimed_at = None
+    row.claimed_by = None
+    row.updated_at = datetime.now(timezone.utc)
+
+    audit(db, "cancel", "notification", row.id)
+    db.commit()
+    db.refresh(row)
+    return row
 
 
 @admin_router.delete("/notifications/{item_id}", status_code=204)
 def delete_notification(item_id: int, db: Session = Depends(get_db)):
     row = db.get(models.AdminNotification, item_id)
-    if not row: raise HTTPException(404, "Notificação não encontrada")
-    audit(db, "delete", "notification", row.id, row_dict(row)); db.delete(row); db.commit()
+    if not row:
+        raise HTTPException(404, "Notificação não encontrada")
+    audit(db, "delete", "notification", row.id, row_dict(row))
+    db.delete(row)
+    db.commit()
 
 
 class HomeDraftIn(BaseModel):

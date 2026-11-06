@@ -1,0 +1,11 @@
+services:
+  backend:
+    environment:
+      FIREBASE_SERVICE_ACCOUNT_PATH: /run/secrets/huaplay-fcm.json
+    volumes:
+      - type: bind
+        source: ${HUAPLAY_FCM_CREDENTIALS_FILE:-/home/deploy/.config/huaplay/firebase-service-account.json}
+        target: /run/secrets/huaplay-fcm.json
+        read_only: true
+        bind:
+          create_host_path: false
