@@ -11,6 +11,14 @@ interface MotionEventWithPermission {
     requestPermission?: () => Promise<'granted' | 'denied'>;
 }
 
+const CATEGORY_OPTIONS = [
+    { value: 'playback', label: 'Vídeo ou reprodução' },
+    { value: 'wrong_content', label: 'Conteúdo incorreto' },
+    { value: 'subtitle', label: 'Áudio ou legenda' },
+    { value: 'bug', label: 'Erro no aplicativo' },
+    { value: 'other', label: 'Outro problema' },
+] as const;
+
 const OPEN_REPORT_EVENT = 'huaplay:open-report';
 
 export default function ShakeToReport() {
@@ -19,6 +27,7 @@ export default function ShakeToReport() {
     const [isOpen, setIsOpen] = useState(false);
     const [status, setStatus] = useState<ReportState>('idle');
     const [motionEnabled, setMotionEnabled] = useState(false);
+    const [selectedCategory, setSelectedCategory] = useState<string>('playback');
     const isOpenRef = useRef(false);
     const lastMotion = useRef({ x: 0, y: 0, z: 0, time: 0, trigger: 0 });
 
@@ -47,6 +56,7 @@ export default function ShakeToReport() {
     const openSheet = useCallback(() => {
         if (!window.matchMedia('(max-width: 767px)').matches || isExcludedRoute) return;
         setStatus('idle');
+        setSelectedCategory('playback');
         setIsOpen(true);
     }, [isExcludedRoute]);
 
@@ -147,22 +157,69 @@ export default function ShakeToReport() {
                                     <button type="button" onClick={() => setIsOpen(false)} className="mt-4 rounded-xl bg-green-500/20 px-4 py-2 font-semibold">Fechar</button>
                                 </div>
                             ) : (
-                                <form onSubmit={submitReport} className="space-y-3">
-                                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                                        <label className="text-xs font-medium text-gray-300">Tipo do problema
-                                            <select name="category" required className="mt-1.5 w-full rounded-xl border border-white/10 bg-black/50 px-3 py-2.5 text-sm text-white outline-none focus:border-primary/60">
-                                                <option value="playback">Vídeo ou reprodução</option><option value="wrong_content">Conteúdo incorreto</option><option value="subtitle">Áudio ou legenda</option><option value="bug">Erro no aplicativo</option><option value="other">Outro problema</option>
-                                            </select>
+                                <form onSubmit={submitReport} className="space-y-4">
+                                    <div className="space-y-2">
+                                        <label id="report-category-group" className="block text-xs font-semibold uppercase tracking-wider text-gray-300">
+                                            Tipo do problema
                                         </label>
-                                        {!user?.email && <label className="text-xs font-medium text-gray-300">E-mail <span className="text-gray-600">(opcional)</span><input name="email" type="email" maxLength={160} className="mt-1.5 w-full rounded-xl border border-white/10 bg-black/50 px-3 py-2.5 text-sm text-white outline-none focus:border-primary/60" /></label>}
+                                        <input type="hidden" name="category" value={selectedCategory} />
+                                        <div
+                                            role="radiogroup"
+                                            aria-labelledby="report-category-group"
+                                            className="grid grid-cols-2 gap-2 sm:grid-cols-3"
+                                        >
+                                            {CATEGORY_OPTIONS.map((opt) => {
+                                                const isSelected = selectedCategory === opt.value;
+                                                return (
+                                                    <button
+                                                        key={opt.value}
+                                                        type="button"
+                                                        role="radio"
+                                                        aria-checked={isSelected}
+                                                        onClick={() => setSelectedCategory(opt.value)}
+                                                        className={`flex items-center justify-center rounded-xl border px-3 py-2.5 text-xs font-medium text-center transition-all select-none active:scale-95 ${
+                                                            isSelected
+                                                                ? 'border-primary bg-primary/20 text-primary shadow-[0_0_12px_rgba(229,169,59,0.25)] font-semibold'
+                                                                : 'border-white/10 bg-[#161616] text-gray-300 hover:border-white/25 hover:bg-[#202020]'
+                                                        }`}
+                                                    >
+                                                        {opt.label}
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
                                     </div>
-                                    <label className="block text-xs font-medium text-gray-300">O que aconteceu?
-                                        <textarea name="message" required minLength={10} maxLength={1000} rows={3} placeholder="Descreva o problema…" className="mt-1.5 w-full resize-none rounded-xl border border-white/10 bg-black/50 px-3 py-2.5 text-sm text-white placeholder:text-gray-700 outline-none focus:border-primary/60" />
+                                    {!user?.email && (
+                                        <label className="block text-xs font-medium text-gray-300">
+                                            E-mail <span className="text-gray-500">(opcional)</span>
+                                            <input
+                                                name="email"
+                                                type="email"
+                                                maxLength={160}
+                                                placeholder="seu@email.com"
+                                                className="mt-1.5 w-full rounded-xl border border-white/10 bg-black/60 px-3 py-2.5 text-sm text-white placeholder:text-gray-600 outline-none focus:border-primary/60"
+                                            />
+                                        </label>
+                                    )}
+                                    <label className="block text-xs font-medium text-gray-300">
+                                        O que aconteceu?
+                                        <textarea
+                                            name="message"
+                                            required
+                                            minLength={10}
+                                            maxLength={1000}
+                                            rows={3}
+                                            placeholder="Descreva o problema com o máximo de detalhes…"
+                                            className="mt-1.5 w-full resize-none rounded-xl border border-white/10 bg-black/60 px-3 py-2.5 text-sm text-white placeholder:text-gray-600 outline-none focus:border-primary/60"
+                                        />
                                     </label>
                                     {status === 'error' && <p role="alert" className="text-xs text-red-400">Não foi possível enviar agora. Tente novamente.</p>}
-                                    <div className="flex items-center justify-between gap-3">
-                                        <span className="text-[10px] text-gray-600">{motionEnabled ? 'Agitar está ativo neste aparelho.' : 'Use este botão quando o sensor não estiver disponível.'}</span>
-                                        <button type="submit" disabled={status === 'sending'} className="flex items-center gap-2 rounded-xl bg-primary px-5 py-2.5 text-sm font-bold text-black disabled:opacity-60"><Send className="h-4 w-4" />{status === 'sending' ? 'Enviando…' : 'Enviar'}</button>
+                                    <div className="flex items-center justify-between gap-3 pt-1">
+                                        <span className="text-[10px] text-gray-500">{motionEnabled ? 'Agitar está ativo neste aparelho.' : 'Use este botão quando o sensor não estiver disponível.'}</span>
+                                        <button type="submit" disabled={status === 'sending'} className="flex items-center gap-2 rounded-xl bg-primary px-5 py-2.5 text-sm font-bold text-black shadow-lg shadow-primary/20 transition-all hover:bg-yellow-400 active:scale-95 disabled:opacity-60">
+                                            <Send className="h-4 w-4" />
+                                            {status === 'sending' ? 'Enviando…' : 'Enviar'}
+                                        </button>
                                     </div>
                                 </form>
                             )}
