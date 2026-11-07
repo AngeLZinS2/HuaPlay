@@ -8,6 +8,7 @@ import {
     limit as fsLimit,
     orderBy,
     query,
+    runTransaction,
     serverTimestamp,
     setDoc,
     where,
@@ -80,6 +81,11 @@ export async function ensureUserDoc(user: User): Promise<void> {
 
 // ---------------------------------------------------------------- profiles
 
+export const DEFAULT_PROFILE_ID = 'default';
+
+// Singleflight cache to prevent concurrent bootstrap calls for the same UID in this client runtime
+const bootstrapInFlight = new Map<string, Promise<UserProfile[]>>();
+
 export async function listProfiles(uid: string): Promise<UserProfile[]> {
     const snap = await getDocs(query(profilesCol(uid), orderBy('createdAt', 'asc')));
     return snap.docs.map((d) => ({
@@ -89,15 +95,63 @@ export async function listProfiles(uid: string): Promise<UserProfile[]> {
     }));
 }
 
-/** Returns the existing profiles, creating a default one when there are none. */
+/**
+ * Returns existing profiles or safely bootstraps a default profile without duplication.
+ *
+ * Employs:
+ * 1. Singleflight map per UID to coalesce simultaneous in-app calls.
+ * 2. Deterministic default profile ID ('default') and Firestore transaction
+ *    to prevent concurrent multi-device race conditions.
+ * 3. Never deletes, alters, or hides existing profiles.
+ */
 export async function listOrCreateProfiles(user: User): Promise<UserProfile[]> {
-    const existing = await listProfiles(user.uid);
-    if (existing.length > 0) return existing;
-    const created = await createProfile(user.uid, {
-        name: user.displayName || user.email?.split('@')[0] || 'Principal',
-        avatarUrl: user.photoURL || DEFAULT_AVATAR,
-    });
-    return [created];
+    const uid = user.uid;
+    const inflight = bootstrapInFlight.get(uid);
+    if (inflight) {
+        return inflight;
+    }
+
+    const task = (async () => {
+        try {
+            // First check if any profiles already exist
+            const existing = await listProfiles(uid);
+            if (existing.length > 0) {
+                return existing;
+            }
+
+            const defaultRef = profileDoc(uid, DEFAULT_PROFILE_ID);
+            const defaultName = user.displayName || user.email?.split('@')[0] || 'Principal';
+            const defaultAvatar = user.photoURL || DEFAULT_AVATAR;
+
+            // Use runTransaction on deterministic document reference to serialize cross-device creation
+            await runTransaction(db, async (txn) => {
+                const snap = await txn.get(defaultRef);
+                if (!snap.exists()) {
+                    txn.set(defaultRef, {
+                        name: defaultName,
+                        avatarUrl: defaultAvatar,
+                        createdAt: serverTimestamp(),
+                    });
+                }
+            });
+
+            // Re-read full profiles list to guarantee all profiles (including any created concurrently) are present
+            const refreshed = await listProfiles(uid);
+            if (refreshed.length > 0) {
+                return refreshed;
+            }
+            return [{
+                id: DEFAULT_PROFILE_ID,
+                name: defaultName,
+                avatarUrl: defaultAvatar,
+            }];
+        } finally {
+            bootstrapInFlight.delete(uid);
+        }
+    })();
+
+    bootstrapInFlight.set(uid, task);
+    return task;
 }
 
 export async function createProfile(

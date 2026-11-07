@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import {
     GoogleAuthProvider,
     createUserWithEmailAndPassword,
@@ -62,36 +62,62 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const uid = user?.uid ?? null;
 
+    // Sequence counters to prevent race conditions on account switch and out-of-order responses
+    const authSeqRef = useRef(0);
+    const profileSeqRef = useRef(0);
+    const listSeqRef = useRef(0);
+
     const updateLists = useCallback(async () => {
-        if (!uid || !currentProfile) {
+        const currentSeq = ++listSeqRef.current;
+        const targetUid = uid;
+        const targetProfileId = currentProfile?.id;
+
+        if (!targetUid || !targetProfileId) {
             setMyListIds([]);
             setMyLikeIds([]);
             return;
         }
         try {
             const [list, likes] = await Promise.all([
-                listMyList(uid, currentProfile.id),
-                listLikes(uid, currentProfile.id),
+                listMyList(targetUid, targetProfileId),
+                listLikes(targetUid, targetProfileId),
             ]);
-            setMyListIds(list);
-            setMyLikeIds(likes);
+            // Discard stale responses if user or profile changed while fetching
+            if (listSeqRef.current === currentSeq && auth.currentUser?.uid === targetUid) {
+                setMyListIds(list);
+                setMyLikeIds(likes);
+            }
         } catch (error) {
-            console.error('Failed to load list/likes from Firestore', error);
+            if (listSeqRef.current === currentSeq) {
+                console.error('Failed to load list/likes from Firestore', error);
+            }
         }
-    }, [uid, currentProfile]);
+    }, [uid, currentProfile?.id]);
 
     const fetchProfiles = useCallback(async () => {
         if (!user) return;
+        const currentSeq = ++profileSeqRef.current;
+        const targetUid = user.uid;
+
         try {
             const list = await listOrCreateProfiles(user);
+            // Protect against account switch / stale response
+            if (profileSeqRef.current !== currentSeq || auth.currentUser?.uid !== targetUid) return;
+
             setProfiles(list);
 
-            const storedId = localStorage.getItem(PROFILE_KEY);
+            const scopedKey = `${PROFILE_KEY}_${targetUid}`;
+            const storedId = localStorage.getItem(scopedKey) || localStorage.getItem(PROFILE_KEY);
             const selected = list.find((p) => p.id === storedId) ?? list[0] ?? null;
             setCurrentProfile(selected);
-            if (selected) localStorage.setItem(PROFILE_KEY, selected.id);
+            if (selected) {
+                localStorage.setItem(scopedKey, selected.id);
+                localStorage.setItem(PROFILE_KEY, selected.id);
+            }
         } catch (error) {
-            console.error('Failed to load profiles from Firestore', error);
+            if (profileSeqRef.current === currentSeq) {
+                console.error('Failed to load profiles from Firestore', error);
+            }
         }
     }, [user]);
 
@@ -99,7 +125,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // ID token on its own, so there is no token handling left in this app.
     useEffect(() => {
         return onAuthStateChanged(auth, async (fbUser) => {
+            const currentSeq = ++authSeqRef.current;
             setUser(fbUser);
+
             if (!fbUser) {
                 setIsAdmin(false);
                 setProfiles([]);
@@ -110,21 +138,37 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 setIsLoading(false);
                 return;
             }
+
+            // Reset lists and profiles immediately on account transition
+            setProfiles([]);
+            setCurrentProfile(null);
+            setMyListIds([]);
+            setMyLikeIds([]);
+
             try {
                 await ensureUserDoc(fbUser);
             } catch (error) {
                 console.error('Failed to create the Firestore user document', error);
             }
+
+            if (authSeqRef.current !== currentSeq) return;
+
             try {
                 // Only the catalog backend can say whether this identity is an
                 // admin — never a client-held value, which the user could edit.
                 const identity = await getBackendIdentity();
-                setIsAdmin(identity.is_admin);
+                if (authSeqRef.current === currentSeq) {
+                    setIsAdmin(identity.is_admin);
+                }
             } catch (error) {
-                console.error('Failed to resolve admin status', error);
-                setIsAdmin(false);
+                if (authSeqRef.current === currentSeq) {
+                    console.error('Failed to resolve admin status', error);
+                    setIsAdmin(false);
+                }
             } finally {
-                setIsLoading(false);
+                if (authSeqRef.current === currentSeq) {
+                    setIsLoading(false);
+                }
             }
         });
     }, []);
@@ -189,6 +233,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             if (uid) setStoredOptIn(false, uid);
         }
 
+        if (uid) {
+            localStorage.removeItem(`${PROFILE_KEY}_${uid}`);
+        }
+        localStorage.removeItem(PROFILE_KEY);
+
         if (import.meta.env.MODE === 'mobile' && Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android') {
             try {
                 const { FirebaseAuthentication } = await import('@capacitor-firebase/authentication');
@@ -202,6 +251,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const selectProfile = (profile: UserProfile) => {
         setCurrentProfile(profile);
+        if (uid) {
+            localStorage.setItem(`${PROFILE_KEY}_${uid}`, profile.id);
+        }
         localStorage.setItem(PROFILE_KEY, profile.id);
     };
 
