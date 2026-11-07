@@ -27,6 +27,10 @@ import {
   registerNativePushWithTimeout,
   registerWebPushWithVapid,
   getVapidKey,
+  isAutoPromptDone,
+  setAutoPromptDone,
+  isExplicitlyDisabled,
+  setExplicitlyDisabled,
 } from '../services/notifications';
 import { sanitizeAppRoute } from '../utils/safeRoute';
 
@@ -199,6 +203,27 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     };
   }, [loadFeed]);
 
+  const listenersReadyPromiseRef = useRef<Promise<void> | null>(null);
+  const isRegisteringNativeRef = useRef<boolean>(false);
+
+  const safeRegisterNative = useCallback(async (targetUid: string) => {
+    if (isRegisteringNativeRef.current) return;
+    if (isExplicitlyDisabled(targetUid)) return;
+
+    isRegisteringNativeRef.current = true;
+    try {
+      if (listenersReadyPromiseRef.current) {
+        await listenersReadyPromiseRef.current;
+      }
+      const { PushNotifications } = await import('@capacitor/push-notifications');
+      await PushNotifications.register();
+    } catch {
+      // Non-blocking
+    } finally {
+      isRegisteringNativeRef.current = false;
+    }
+  }, []);
+
   // 1. Persistent listeners attached ONCE on mount independent of opt-in/permission
   useEffect(() => {
     let disposed = false;
@@ -206,7 +231,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
 
     // Native Android persistent listeners
     if (Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android') {
-      void (async () => {
+      listenersReadyPromiseRef.current = (async () => {
         try {
           const { PushNotifications } = await import('@capacitor/push-notifications');
           if (disposed) return;
@@ -252,7 +277,8 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
             const currentUid = uidRef.current;
             const isOptedIn = isSubscribedRef.current;
             const hasPerm = hasPermissionRef.current;
-            if (token && currentUid && isOptedIn && hasPerm) {
+            // Only subscribe to backend after login with authenticated UID
+            if (token && currentUid && isOptedIn && hasPerm && !isExplicitlyDisabled(currentUid)) {
               void subscribeDeviceToken(token, 'android', currentUid);
             }
           });
@@ -288,12 +314,77 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  // 2. Permission and subscription restore (separate effect on uid + isSubscribed)
+  // 2. First-launch native Android auto-permission check:
+  // Requests runtime notification permission once per installation automatically without opening bell UI.
+  // Respects explicit denial/disabling and never auto-requests on Web.
+  useEffect(() => {
+    let disposed = false;
+    if (!Capacitor.isNativePlatform() || Capacitor.getPlatform() !== 'android') {
+      return;
+    }
+
+    if (isAutoPromptDone() || isExplicitlyDisabled(uid)) {
+      return;
+    }
+
+    void (async () => {
+      try {
+        const { PushNotifications } = await import('@capacitor/push-notifications');
+        if (disposed) return;
+
+        const checkRes = await PushNotifications.checkPermissions();
+        if (disposed) return;
+
+        if (checkRes.receive === 'granted') {
+          setAutoPromptDone();
+          setHasPermission(true);
+          return;
+        }
+
+        if (checkRes.receive === 'denied') {
+          setAutoPromptDone();
+          setHasPermission(false);
+          return;
+        }
+
+        // Mark prompt completed so it executes strictly once per installation
+        setAutoPromptDone();
+
+        // Prompt native OS dialog
+        const reqResult = await PushNotifications.requestPermissions();
+        if (disposed) return;
+
+        const granted = reqResult.receive === 'granted';
+        setHasPermission(granted);
+
+        if (granted) {
+          const currentUid = uidRef.current;
+          if (currentUid && !isExplicitlyDisabled(currentUid)) {
+            setStoredOptIn(true, currentUid);
+            setIsSubscribed(true);
+            if (!disposed) {
+              await safeRegisterNative(currentUid);
+            }
+          }
+        } else {
+          setExplicitlyDisabled(true, uidRef.current);
+        }
+      } catch {
+        // Non-blocking
+      }
+    })();
+
+    return () => {
+      disposed = true;
+    };
+  }, [uid, safeRegisterNative]);
+
+  // 3. Permission and subscription restore / Android auto opt-in
   useEffect(() => {
     let disposed = false;
 
     async function restoreSubscription() {
-      // Native Android restoration
+      // Native Android restoration & auto opt-in
       if (Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android') {
         try {
           const { PushNotifications } = await import('@capacitor/push-notifications');
@@ -306,15 +397,22 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
           const granted = perm.receive === 'granted';
           setHasPermission(granted);
 
-          if (granted && uid && isSubscribed) {
+          if (granted && uid && !isExplicitlyDisabled(uid)) {
+            // Se permissão concedida e usuário logado, auto-ativar opt-in se ainda não ativo
+            if (!isSubscribed) {
+              setStoredOptIn(true, uid);
+              setIsSubscribed(true);
+            }
+
             // Re-confirm token with backend if device token is stored
             const token = getStoredDeviceToken();
             if (token) {
               void subscribeDeviceToken(token, 'android', uid);
             }
 
-            // Startup when already opted in: checkPermissions + register (no requestPermissions)
-            await PushNotifications.register();
+            if (!disposed) {
+              await safeRegisterNative(uid);
+            }
           } else if (!granted && uid && isSubscribed) {
             setStoredOptIn(false, uid);
             setIsSubscribed(false);
@@ -323,12 +421,12 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
           // Non-blocking
         }
       } else {
-        // Web restoration
+        // Web restoration (sem autoativação de opt-in, respeita isSubscribed salvo)
         if (typeof window !== 'undefined' && 'Notification' in window) {
           const granted = Notification.permission === 'granted';
           setHasPermission(granted);
 
-          if (granted && uid && isSubscribed) {
+          if (granted && uid && isSubscribed && !isExplicitlyDisabled(uid)) {
             const token = getStoredDeviceToken();
             if (token) {
               void subscribeDeviceToken(token, 'web', uid);
@@ -346,7 +444,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     return () => {
       disposed = true;
     };
-  }, [uid, isSubscribed]);
+  }, [uid, isSubscribed, safeRegisterNative]);
 
   const markAsRead = useCallback(
     (id: number) => {
@@ -388,6 +486,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
       if (Capacitor.isNativePlatform()) {
         const result = await registerNativePushWithTimeout(uid);
         if (result.success) {
+          setExplicitlyDisabled(false, uid);
           setHasPermission(true);
           setIsSubscribed(true);
           setPushStatusMessage('Notificações push ativadas com sucesso!');
@@ -403,6 +502,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
 
         const result = await registerWebPushWithVapid(vapidKey, uid);
         if (result.success) {
+          setExplicitlyDisabled(false, uid);
           setHasPermission(true);
           setIsSubscribed(true);
           setPushStatusMessage('Notificações push ativadas no navegador!');
@@ -436,6 +536,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
 
     setStoredDeviceToken(null);
     setStoredOptIn(false, uid);
+    setExplicitlyDisabled(true, uid);
     setIsSubscribed(false);
     setPushStatusMessage('Notificações push desativadas.');
   }, [uid]);

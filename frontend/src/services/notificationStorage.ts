@@ -90,3 +90,50 @@ export function setStoredOptIn(enabled: boolean, uid?: string | null): void {
     // Non-blocking
   }
 }
+
+const AUTO_PROMPT_KEY = 'huaplay_push_auto_prompted_once';
+const EXPLICIT_DISABLED_KEY = 'huaplay_push_explicitly_disabled';
+
+export function isAutoPromptDone(): boolean {
+  try {
+    if (typeof localStorage === 'undefined') return true;
+    return localStorage.getItem(AUTO_PROMPT_KEY) === 'true';
+  } catch {
+    return true;
+  }
+}
+
+export function setAutoPromptDone(): void {
+  try {
+    if (typeof localStorage === 'undefined') return;
+    localStorage.setItem(AUTO_PROMPT_KEY, 'true');
+  } catch {
+    // Non-blocking
+  }
+}
+
+export function isExplicitlyDisabled(uid?: string | null): boolean {
+  try {
+    if (typeof localStorage === 'undefined') return false;
+    if (localStorage.getItem(EXPLICIT_DISABLED_KEY) === 'true') return true;
+    if (uid && localStorage.getItem(`${EXPLICIT_DISABLED_KEY}_${uid}`) === 'true') return true;
+    return false;
+  } catch {
+    return false;
+  }
+}
+
+export function setExplicitlyDisabled(disabled: boolean, uid?: string | null): void {
+  try {
+    if (typeof localStorage === 'undefined') return;
+    if (disabled) {
+      localStorage.setItem(EXPLICIT_DISABLED_KEY, 'true');
+      if (uid) localStorage.setItem(`${EXPLICIT_DISABLED_KEY}_${uid}`, 'true');
+    } else {
+      localStorage.removeItem(EXPLICIT_DISABLED_KEY);
+      if (uid) localStorage.removeItem(`${EXPLICIT_DISABLED_KEY}_${uid}`);
+    }
+  } catch {
+    // Non-blocking
+  }
+}

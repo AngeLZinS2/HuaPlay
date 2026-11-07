@@ -318,6 +318,7 @@ test('Native Lifecycle: timeout cancels pending registration, cleans up listener
   <script>
     // Simulate Capacitor Android native environment detected via androidBridge
     window.androidBridge = {};
+    window.__HuaPlaySkipRender = true;
   </script>
   <script>${bundledJs}</script>
 </body>

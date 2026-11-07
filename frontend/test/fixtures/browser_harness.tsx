@@ -61,6 +61,6 @@ function HarnessApp() {
 }
 
 const rootEl = document.getElementById('root');
-if (rootEl) {
+if (rootEl && !(window as any).__HuaPlaySkipRender) {
   createRoot(rootEl).render(<HarnessApp />);
 }
