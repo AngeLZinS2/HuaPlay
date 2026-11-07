@@ -7,6 +7,11 @@ import { fetchMyListSeries } from '../services/library';
 import { getRecentlyWatched } from '../services/userData';
 import { useAuth } from '../context/AuthContext';
 import { useHomeInactivityRedirect } from '../hooks/useHomeInactivityRedirect';
+import {
+    getCachedPublicCatalog,
+    fetchPublicCatalogWithDedup,
+    formatSeriesList,
+} from '../services/catalogCache';
 
 export default function Home() {
     const { uid, isAuthenticated, currentProfile, myListIds, myLikeIds } = useAuth();
@@ -14,121 +19,65 @@ export default function Home() {
     const [recommended, setRecommended] = useState<any[]>([]);
     const [becauseYouWatched, setBecauseYouWatched] = useState<{ base: any; list: any[] } | null>(null);
     const [isPersonalized, setIsPersonalized] = useState(false);
-    const [trending, setTrending] = useState<any[]>([]);
-    const [newReleases, setNewReleases] = useState<any[]>([]);
-    const [wuxiaRow, setWuxiaRow] = useState<any[]>([]);
-    const [managedRows, setManagedRows] = useState<Array<{ id: number; title: string; items: any[] }>>([]);
-    const [hasManagedHome, setHasManagedHome] = useState(false);
-    const [loading, setLoading] = useState(true);
-    const [heroFeatured, setHeroFeatured] = useState<any | null | undefined>(undefined);
+
+    // Initial state restored from limited TTL public cache for instantaneous route transitions
+    const initialCached = getCachedPublicCatalog();
+    const [loading, setLoading] = useState(!initialCached);
+    const [heroFeatured, setHeroFeatured] = useState<any | null | undefined>(
+        initialCached?.data.heroFeatured !== undefined ? initialCached.data.heroFeatured : undefined
+    );
+    const [managedRows, setManagedRows] = useState(initialCached?.data.managedRows ?? []);
+    const [hasManagedHome, setHasManagedHome] = useState(initialCached?.data.hasManagedHome ?? false);
+    const [trending, setTrending] = useState(initialCached?.data.trending ?? []);
+    const [newReleases, setNewReleases] = useState(initialCached?.data.newReleases ?? []);
+    const [wuxiaRow, setWuxiaRow] = useState(initialCached?.data.wuxiaRow ?? []);
     const heroPromiseRef = useRef<Promise<any> | null>(null);
     const { openModal } = useModal();
 
     useHomeInactivityRedirect(isAuthenticated && Boolean(currentProfile));
 
-    const formatSeries = (items: any[]) => {
-        return (items || []).map((item: any) => ({
-            id: item.id,
-            title: item.title,
-            cover_image: item.cover_image,
-            image: item.cover_image || "https://images.unsplash.com/photo-1536440136628-849c177e76a1?q=80&w=600&auto=format&fit=crop",
-            banner_image: item.banner_image,
-            banner: item.banner_image,
-            match: `${Math.floor(Math.random() * 8 + 92)}% Relevante`,
-            duration: `${item.release_year || '2024'}`,
-            genre: item.genre || 'Dorama',
-            description: item.description,
-            trailer_url: item.trailer_url,
-            release_year: item.release_year,
-            cast: item.cast || "Elenco não informado",
-            moods: "Envolvente, Emocionante",
-        }));
-    };
-
-    // Updating My List or likes must not rerun the initial catalog request. That
-    // used to put the whole page back into its full-screen loading state, which
-    // looked like a browser refresh after every click.
+    // Public catalog & Hero lifecycle with deduplication and stale-while-revalidate
     useEffect(() => {
         const controller = new AbortController();
         let isCancelled = false;
 
-        // Start hero request alongside sections (fresh controller per effect setup, no duplicate request)
-        const heroPromise = api.get('/series/hero-featured', { signal: controller.signal })
-            .then((res) => {
-                if (!isCancelled) {
-                    setHeroFeatured(res.data || null);
-                }
-                return res.data;
-            })
-            .catch((err: any) => {
-                if (!isCancelled && err?.name !== 'AbortError' && err?.name !== 'CanceledError') {
-                    console.error("Failed to fetch hero featured series:", err);
-                    setHeroFeatured(null);
-                }
-                return null;
-            });
+        const currentCached = getCachedPublicCatalog();
+        const shouldFetch = !currentCached || currentCached.isStale;
 
-        heroPromiseRef.current = heroPromise;
-
-        const fetchCatalogRows = async () => {
-            try {
-                let sections: any[] = [];
-                try {
-                    const homeSectionsRes = await api.get('/home/sections', { signal: controller.signal });
-                    if (Array.isArray(homeSectionsRes.data)) {
-                        sections = homeSectionsRes.data;
-                    }
-                } catch (err: any) {
-                    if (err?.name !== 'AbortError' && err?.name !== 'CanceledError') {
-                        console.error("Failed to fetch home sections:", err);
-                    }
-                }
-
-                if (isCancelled) return;
-
-                if (sections.length > 0) {
-                    setHasManagedHome(true);
-                    setManagedRows(sections.map((section: any) => ({
-                        id: section.id,
-                        title: section.title,
-                        items: formatSeries(section.items || []),
-                    })));
-                } else {
-                    // Fetch catalog/wuxia only if sections empty or failed
-                    try {
-                        const [allRes, wuxiaRes] = await Promise.all([
-                            api.get('/series/?limit=40', { signal: controller.signal }),
-                            api.get('/series/?genre=Wuxia&limit=20', { signal: controller.signal }),
-                        ]);
-
-                        if (isCancelled) return;
-
-                        const allItems = formatSeries(allRes.data || []);
-                        const shuffledTrending = [...allItems].sort(() => 0.5 - Math.random());
-                        setTrending(shuffledTrending.slice(0, 18));
-
-                        const sortedNew = [...allItems].sort((a, b) => (b.release_year || 0) - (a.release_year || 0));
-                        setNewReleases(sortedNew.slice(0, 18));
-                        setWuxiaRow(formatSeries(wuxiaRes.data || []));
-                        setHasManagedHome(false);
-                    } catch (fallbackError: any) {
-                        if (fallbackError?.name !== 'AbortError' && fallbackError?.name !== 'CanceledError') {
-                            console.error("Fallback catalog fetch failed:", fallbackError);
-                        }
-                    }
-                }
-            } catch (error: any) {
-                if (error?.name !== 'AbortError' && error?.name !== 'CanceledError') {
-                    console.error("Failed to fetch homepage catalog:", error);
-                }
-            } finally {
-                if (!isCancelled) {
-                    setLoading(false);
-                }
+        if (shouldFetch) {
+            if (!currentCached) {
+                setLoading(true);
             }
-        };
 
-        fetchCatalogRows();
+            const fetchPromise = fetchPublicCatalogWithDedup(controller.signal);
+            heroPromiseRef.current = fetchPromise
+                .then((c) => c.heroFeatured)
+                .catch(() => null);
+
+            fetchPromise
+                .then((catalog) => {
+                    if (isCancelled) return;
+                    setHeroFeatured(catalog.heroFeatured);
+                    setHasManagedHome(catalog.hasManagedHome);
+                    setManagedRows(catalog.managedRows);
+                    setTrending(catalog.trending);
+                    setNewReleases(catalog.newReleases);
+                    setWuxiaRow(catalog.wuxiaRow);
+                })
+                .catch((err: any) => {
+                    if (isCancelled || err?.name === 'AbortError' || err?.name === 'CanceledError') {
+                        return;
+                    }
+                    console.error("Failed to load homepage public catalog:", err);
+                })
+                .finally(() => {
+                    if (!isCancelled) {
+                        setLoading(false);
+                    }
+                });
+        } else {
+            setLoading(false);
+        }
 
         return () => {
             isCancelled = true;
@@ -137,9 +86,17 @@ export default function Home() {
         };
     }, []);
 
+    // Personal recommendations: strictly scoped per uid and currentProfile to prevent data leaks between profiles
     useEffect(() => {
         const controller = new AbortController();
         let isCancelled = false;
+
+        // Immediately isolate/reset personal recommendations on account or profile switch
+        if (!uid || !currentProfile) {
+            setRecommended([]);
+            setBecauseYouWatched(null);
+            setIsPersonalized(false);
+        }
 
         const fetchRecommendations = async () => {
             try {
@@ -160,19 +117,19 @@ export default function Home() {
 
                 if (isCancelled) return;
 
-                setIsPersonalized(recData.is_personalized || false);
-                setRecommended(formatSeries(recData.recommendations || []));
+                setIsPersonalized(recData?.is_personalized || false);
+                setRecommended(formatSeriesList(recData?.recommendations || []));
 
-                if (recData.because_you_watched) {
+                if (recData?.because_you_watched) {
                     setBecauseYouWatched({
                         base: recData.because_you_watched.base_series,
-                        list: formatSeries(recData.because_you_watched.recommendations)
+                        list: formatSeriesList(recData.because_you_watched.recommendations || []),
                     });
                 } else {
                     setBecauseYouWatched(null);
                 }
             } catch (error: any) {
-                if (error?.name !== 'AbortError' && error?.name !== 'CanceledError') {
+                if (!isCancelled && error?.name !== 'AbortError' && error?.name !== 'CanceledError') {
                     console.error("Failed to fetch homepage recommendations:", error);
                 }
             }
@@ -184,9 +141,9 @@ export default function Home() {
             isCancelled = true;
             controller.abort();
         };
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [uid, currentProfile?.id, myLikeIds, myListIds]);
 
+    // My List: strictly per profile and uid
     useEffect(() => {
         let isCancelled = false;
 
@@ -198,7 +155,7 @@ export default function Home() {
             try {
                 const listData = await fetchMyListSeries(uid, currentProfile.id);
                 if (isCancelled) return;
-                setMyListRow(formatSeries(listData || []));
+                setMyListRow(formatSeriesList(listData || []));
             } catch (err) {
                 if (!isCancelled) {
                     console.error("Failed to fetch My List for homepage:", err);
@@ -212,7 +169,7 @@ export default function Home() {
         return () => {
             isCancelled = true;
         };
-    }, [isAuthenticated, currentProfile, uid, myListIds]);
+    }, [isAuthenticated, currentProfile?.id, uid, myListIds]);
 
     const handleOpenModal = useCallback((seriesItem: any) => {
         openModal(seriesItem);

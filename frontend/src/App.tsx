@@ -3,7 +3,7 @@ import { AnimatePresence } from 'framer-motion';
 import { ModalProvider } from './context/ModalContext';
 import { NotificationProvider } from './context/NotificationContext';
 import { useAuth } from './context/AuthContext';
-import { lazy, Suspense, use, useEffect, type ComponentType, type ReactNode } from 'react';
+import { lazy, Suspense, use, useEffect, useState, type ComponentType, type ReactNode } from 'react';
 import { Capacitor } from '@capacitor/core';
 import SeriesDetailsModal from './components/SeriesDetailsModal';
 import Navbar from './components/Navbar';
@@ -20,9 +20,28 @@ const NativeAppUpdater = isNativeAndroid
   ? lazy(() => import('./components/NativeAppUpdater'))
   : null;
 
+const isTouchOrCoarse = () => {
+  if (typeof window === 'undefined') return false;
+  return (
+    isNativeAndroid ||
+    window.matchMedia?.('(pointer: coarse)').matches ||
+    window.innerWidth < 768 ||
+    'ontouchstart' in window
+  );
+};
+
 function lazyPage<T extends ComponentType>(loader: () => Promise<{ default: T }>) {
   let pending: ReturnType<typeof loader> | undefined;
-  const preload = () => pending ??= loader();
+  const preload = () => {
+    if (!pending) {
+      pending = loader().catch((err) => {
+        // Libera pending rejeitada para permitir retry subsequente
+        pending = undefined;
+        throw err;
+      }) as ReturnType<typeof loader>;
+    }
+    return pending;
+  };
   return { Page: lazy(preload), preload };
 }
 
@@ -56,12 +75,24 @@ const { Page: Copyright, preload: loadCopyright } = lazyPage(() => import('./pag
 const { Page: Contact, preload: loadContact } = lazyPage(() => import('./pages/Contact'));
 const { Page: CategoryExplore, preload: loadCategoryExplore } = lazyPage(() => import('./pages/CategoryExplore'));
 
-const pageLoaders: Record<string, () => Promise<unknown>> = {
-  '/login': loadLogin, '/profile': loadProfile, '/profiles': loadProfiles,
-  '/my-list': loadMyList, '/actors': loadActors, '/actresses': loadActors,
-  '/explore': loadCategoryExplore, '/schedule': loadCategoryExplore, '/coming-soon': loadCategoryExplore,
-  '/faq': loadFAQ, '/terms': loadTerms, '/privacy': loadPrivacy,
-  '/copyright': loadCopyright, '/contact': loadContact,
+export const publicPageLoaders: Record<string, () => Promise<unknown>> = {
+  '/login': loadLogin,
+  '/profile': loadProfile,
+  '/profiles': loadProfiles,
+  '/my-list': loadMyList,
+  '/actors': loadActors,
+  '/actresses': loadActors,
+  '/explore': loadCategoryExplore,
+  '/schedule': loadCategoryExplore,
+  '/coming-soon': loadCategoryExplore,
+  '/faq': loadFAQ,
+  '/terms': loadTerms,
+  '/privacy': loadPrivacy,
+  '/copyright': loadCopyright,
+  '/contact': loadContact,
+};
+
+export const adminPageLoaders: Record<string, () => Promise<unknown>> = {
   '/admin': loadAdminDashboard,
   '/admin/series': loadAdminSeries,
   '/admin/episodes': loadAdminEpisodes,
@@ -80,15 +111,41 @@ const pageLoaders: Record<string, () => Promise<unknown>> = {
   '/admin/home-preview': loadAdminHomePreview,
 };
 
-function RouteReady({ pathname, children }: { pathname: string; children: ReactNode }) {
+/**
+ * Safely prefetches common public routes on intent (touch/hover) or idle.
+ * Guaranteed never to load admin chunks for public users.
+ */
+export function prefetchPublicRoute(pathname: string): void {
   const normalized = pathname.replace(/\/+$/, '') || '/';
-  const loader = pageLoaders[normalized]
+  if (normalized.startsWith('/admin')) {
+    return; // Strict guard: never prefetch admin for users
+  }
+  const loader = publicPageLoaders[normalized]
     ?? (normalized.startsWith('/series/') ? loadSeriesDetail : undefined)
     ?? (normalized.startsWith('/actors/') ? loadActorDetail : undefined)
     ?? (/^\/(category|tag|collection)\//.test(normalized) ? loadCategoryExplore : undefined);
 
-  // Suspend before AnimatePresence starts its exit, keeping the previous page
-  // visible during the router transition until the destination chunk is ready.
+  if (loader) {
+    loader().catch(() => {
+      // Captura rejeição de preload silenciosamente sem quebrar
+    });
+  }
+}
+
+function PublicRouteReady({ pathname, children }: { pathname: string; children: ReactNode }) {
+  const normalized = pathname.replace(/\/+$/, '') || '/';
+  const loader = publicPageLoaders[normalized]
+    ?? (normalized.startsWith('/series/') ? loadSeriesDetail : undefined)
+    ?? (normalized.startsWith('/actors/') ? loadActorDetail : undefined)
+    ?? (/^\/(category|tag|collection)\//.test(normalized) ? loadCategoryExplore : undefined);
+
+  if (loader) use(loader());
+  return children;
+}
+
+function AdminRouteReady({ pathname, children }: { pathname: string; children: ReactNode }) {
+  const normalized = pathname.replace(/\/+$/, '') || '/';
+  const loader = adminPageLoaders[normalized];
   if (loader) use(loader());
   return children;
 }
@@ -120,6 +177,13 @@ function App() {
   const location = useLocation();
   const navigate = useNavigate();
   const { isAuthenticated, currentProfile, isLoading } = useAuth();
+  const [isMobileDevice, setIsMobileDevice] = useState(isTouchOrCoarse);
+
+  useEffect(() => {
+    const update = () => setIsMobileDevice(isTouchOrCoarse());
+    window.addEventListener('resize', update, { passive: true });
+    return () => window.removeEventListener('resize', update);
+  }, []);
 
   const isAdminRoute = location.pathname.startsWith('/admin');
 
@@ -131,6 +195,31 @@ function App() {
     }
   }, [isAuthenticated, currentProfile, isLoading, location.pathname, navigate, isAdminRoute]);
 
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const prefetchCommon = () => {
+      loadCategoryExplore().catch(() => {});
+      loadMyList().catch(() => {});
+      loadProfile().catch(() => {});
+    };
+
+    if ('requestIdleCallback' in window) {
+      const handle = (window as unknown as { requestIdleCallback: (cb: () => void, opts: { timeout: number }) => number }).requestIdleCallback(
+        prefetchCommon,
+        { timeout: 3000 }
+      );
+      return () => {
+        if ('cancelIdleCallback' in window) {
+          (window as unknown as { cancelIdleCallback: (id: number) => void }).cancelIdleCallback(handle);
+        }
+      };
+    } else {
+      const timer = setTimeout(prefetchCommon, 1500);
+      return () => clearTimeout(timer);
+    }
+  }, []);
+
   // ─── Admin Layout (isolated) ───────────────────────────────────────────────
   if (isAdminRoute) {
     return (
@@ -138,7 +227,7 @@ function App() {
         <RequireAdmin>
           <AdminLayout>
             <Suspense fallback={<PageLoading />}>
-              <RouteReady pathname={location.pathname}>
+              <AdminRouteReady pathname={location.pathname}>
                 <AnimatePresence mode="wait">
                   <Routes location={location} key={location.pathname}>
                     <Route path="/admin" element={<AdminDashboard />} />
@@ -159,7 +248,7 @@ function App() {
                     <Route path="/admin/home-preview" element={<AdminHomePreview />} />
                   </Routes>
                 </AnimatePresence>
-              </RouteReady>
+              </AdminRouteReady>
             </Suspense>
           </AdminLayout>
         </RequireAdmin>
@@ -173,36 +262,44 @@ function App() {
   }
 
   // ─── Public Layout ─────────────────────────────────────────────────────────
+  const publicRoutes = (
+    <Routes location={location} key={location.pathname}>
+      <Route path="/" element={<PageTransition><Home /></PageTransition>} />
+      <Route path="/series/:id" element={<PageTransition><SeriesDetail /></PageTransition>} />
+      <Route path="/login" element={<PageTransition><Login /></PageTransition>} />
+      <Route path="/profiles" element={<PageTransition><Profiles /></PageTransition>} />
+      <Route path="/explore" element={<PageTransition><CategoryExplore /></PageTransition>} />
+      <Route path="/category/:category" element={<PageTransition><CategoryExplore /></PageTransition>} />
+      <Route path="/tag/:tag" element={<PageTransition><CategoryExplore /></PageTransition>} />
+      <Route path="/collection/:collection" element={<PageTransition><CategoryExplore /></PageTransition>} />
+      <Route path="/schedule" element={<PageTransition><CategoryExplore /></PageTransition>} />
+      <Route path="/coming-soon" element={<PageTransition><CategoryExplore /></PageTransition>} />
+      <Route path="/my-list" element={<PageTransition><MyList /></PageTransition>} />
+      <Route path="/profile" element={<PageTransition><Profile /></PageTransition>} />
+      <Route path="/actors" element={<PageTransition><Actors gender="Male" title="Atores" /></PageTransition>} />
+      <Route path="/actresses" element={<PageTransition><Actors gender="Female" title="Atrizes" /></PageTransition>} />
+      <Route path="/actors/:id" element={<PageTransition><ActorDetail /></PageTransition>} />
+      <Route path="/faq" element={<PageTransition><FAQ /></PageTransition>} />
+      <Route path="/terms" element={<PageTransition><Terms /></PageTransition>} />
+      <Route path="/privacy" element={<PageTransition><Privacy /></PageTransition>} />
+      <Route path="/copyright" element={<PageTransition><Copyright /></PageTransition>} />
+      <Route path="/contact" element={<PageTransition><Contact /></PageTransition>} />
+    </Routes>
+  );
+
   return (
     <>
       <PublicLayout>
         <Suspense fallback={<PageLoading />}>
-          <RouteReady pathname={location.pathname}>
-            <AnimatePresence mode="wait">
-              <Routes location={location} key={location.pathname}>
-                <Route path="/" element={<PageTransition><Home /></PageTransition>} />
-                <Route path="/series/:id" element={<PageTransition><SeriesDetail /></PageTransition>} />
-                <Route path="/login" element={<PageTransition><Login /></PageTransition>} />
-                <Route path="/profiles" element={<PageTransition><Profiles /></PageTransition>} />
-                <Route path="/explore" element={<PageTransition><CategoryExplore /></PageTransition>} />
-                <Route path="/category/:category" element={<PageTransition><CategoryExplore /></PageTransition>} />
-                <Route path="/tag/:tag" element={<PageTransition><CategoryExplore /></PageTransition>} />
-                <Route path="/collection/:collection" element={<PageTransition><CategoryExplore /></PageTransition>} />
-                <Route path="/schedule" element={<PageTransition><CategoryExplore /></PageTransition>} />
-                <Route path="/coming-soon" element={<PageTransition><CategoryExplore /></PageTransition>} />
-                <Route path="/my-list" element={<PageTransition><MyList /></PageTransition>} />
-                <Route path="/profile" element={<PageTransition><Profile /></PageTransition>} />
-                <Route path="/actors" element={<PageTransition><Actors gender="Male" title="Atores" /></PageTransition>} />
-                <Route path="/actresses" element={<PageTransition><Actors gender="Female" title="Atrizes" /></PageTransition>} />
-                <Route path="/actors/:id" element={<PageTransition><ActorDetail /></PageTransition>} />
-                <Route path="/faq" element={<PageTransition><FAQ /></PageTransition>} />
-                <Route path="/terms" element={<PageTransition><Terms /></PageTransition>} />
-                <Route path="/privacy" element={<PageTransition><Privacy /></PageTransition>} />
-                <Route path="/copyright" element={<PageTransition><Copyright /></PageTransition>} />
-                <Route path="/contact" element={<PageTransition><Contact /></PageTransition>} />
-              </Routes>
-            </AnimatePresence>
-          </RouteReady>
+          <PublicRouteReady pathname={location.pathname}>
+            {isMobileDevice ? (
+              publicRoutes
+            ) : (
+              <AnimatePresence mode="wait">
+                {publicRoutes}
+              </AnimatePresence>
+            )}
+          </PublicRouteReady>
         </Suspense>
       </PublicLayout>
       {NativeAppUpdater && (

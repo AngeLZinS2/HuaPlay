@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Compass, Heart, Home, Search, User } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import SearchModal from './SearchModal';
+import { prefetchPublicRoute } from '../App';
 
 const items = [
     { label: 'Início', href: '/', icon: Home },
@@ -38,7 +39,11 @@ export default function MobileBottomNav() {
                                     to={href}
                                     aria-label={label}
                                     aria-current={active ? 'page' : undefined}
-                                    className={`flex min-h-12 flex-col items-center justify-center gap-1 rounded-2xl transition-colors ${active ? 'text-primary' : 'text-white/55 hover:text-white'}`}
+                                    onTouchStart={() => prefetchPublicRoute(href)}
+                                    onPointerDown={() => prefetchPublicRoute(href)}
+                                    onMouseEnter={() => prefetchPublicRoute(href)}
+                                    style={{ touchAction: 'manipulation' }}
+                                    className={`flex min-h-12 flex-col items-center justify-center gap-1 rounded-2xl select-none transition-transform duration-100 ease-out active:scale-90 active:opacity-75 ${active ? 'text-primary' : 'text-white/55 hover:text-white'}`}
                                 >
                                     <Icon className="h-5 w-5" strokeWidth={active ? 2.5 : 2} />
                                     <span className="text-[10px] font-semibold leading-none">{label}</span>
@@ -50,7 +55,8 @@ export default function MobileBottomNav() {
                             type="button"
                             aria-label="Buscar no HuaPlay"
                             onClick={() => setIsSearchOpen(true)}
-                            className="flex min-h-12 flex-col items-center justify-center gap-1 rounded-2xl text-primary transition-colors hover:text-yellow-200 active:scale-95"
+                            style={{ touchAction: 'manipulation' }}
+                            className="flex min-h-12 flex-col items-center justify-center gap-1 rounded-2xl text-primary select-none transition-transform duration-100 ease-out hover:text-yellow-200 active:scale-90 active:opacity-75"
                         >
                             <Search className="h-5 w-5" strokeWidth={2.5} />
                             <span className="text-[10px] font-semibold leading-none">Buscar</span>
@@ -64,7 +70,11 @@ export default function MobileBottomNav() {
                                     to={href}
                                     aria-label={label}
                                     aria-current={active ? 'page' : undefined}
-                                    className={`flex min-h-12 flex-col items-center justify-center gap-1 rounded-2xl transition-colors ${active ? 'text-primary' : 'text-white/55 hover:text-white'}`}
+                                    onTouchStart={() => prefetchPublicRoute(href)}
+                                    onPointerDown={() => prefetchPublicRoute(href)}
+                                    onMouseEnter={() => prefetchPublicRoute(href)}
+                                    style={{ touchAction: 'manipulation' }}
+                                    className={`flex min-h-12 flex-col items-center justify-center gap-1 rounded-2xl select-none transition-transform duration-100 ease-out active:scale-90 active:opacity-75 ${active ? 'text-primary' : 'text-white/55 hover:text-white'}`}
                                 >
                                     <Icon className="h-5 w-5" strokeWidth={active ? 2.5 : 2} />
                                     <span className="text-[10px] font-semibold leading-none">{label}</span>

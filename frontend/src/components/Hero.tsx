@@ -261,7 +261,8 @@ export default function Hero({ initialFeatured, featuredPromise }: HeroProps = {
                 if (isCancelled) return;
                 const pool = (fallbackRes.data || []).filter((s: FeaturedSeries) => s.banner_image);
                 if (pool.length > 0) {
-                    setFeatured(pool[Math.floor(Math.random() * pool.length)]);
+                    // Stable fallback banner ensures image decode reuse and avoids constant redownloads
+                    setFeatured(pool[0]);
                 }
             } catch (error: unknown) {
                 const err = error as { name?: string };
@@ -274,7 +275,7 @@ export default function Hero({ initialFeatured, featuredPromise }: HeroProps = {
                     if (isCancelled) return;
                     const pool = (fallbackRes.data || []).filter((s: FeaturedSeries) => s.banner_image);
                     if (pool.length > 0) {
-                        setFeatured(pool[Math.floor(Math.random() * pool.length)]);
+                        setFeatured(pool[0]);
                     }
                 } catch (fallbackError: unknown) {
                     const fbErr = fallbackError as { name?: string };

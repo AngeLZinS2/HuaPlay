@@ -116,6 +116,100 @@ function SeriesCard({ item, onOpenModal, isFirst, isLast, variant = 'default' }:
         ? (item.banner_image || "https://images.unsplash.com/photo-1536440136628-849c177e76a1?q=80&w=600&auto=format&fit=crop")
         : getOptimizedImageUrl(item.cover_image || item.image, 'poster');
 
+    const renderActionButtons = () => (
+        <div className={`flex items-center ${variant === 'profile' ? 'justify-center gap-4 w-full' : 'justify-between mb-3'}`}>
+            <div className="flex items-center gap-2">
+                <button
+                    onClick={handlePlayClick}
+                    className="w-8 h-8 bg-white rounded-full flex items-center justify-center hover:bg-gray-200 transition-colors"
+                >
+                    <Play className="w-4 h-4 fill-black text-black pl-0.5" />
+                </button>
+                <button
+                    onClick={handleToggleList}
+                    className={`w-8 h-8 border-2 rounded-full flex items-center justify-center transition-colors ${isInList
+                        ? 'border-green-500 bg-green-500/10 text-green-500 hover:bg-green-500/20'
+                        : 'border-gray-400 text-gray-400 hover:border-white hover:text-white'
+                        }`}
+                    title={isInList ? "Remover da Lista" : "Adicionar à Lista"}
+                >
+                    {isInList ? <Check className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
+                </button>
+                <button
+                    onClick={handleToggleLike}
+                    className={`w-8 h-8 border-2 rounded-full flex items-center justify-center transition-colors ${isLiked
+                        ? 'border-[#E50914] bg-[#E50914]/10 text-[#E50914] hover:bg-[#E50914]/20'
+                        : 'border-gray-400 text-gray-400 hover:border-white hover:text-white'
+                        }`}
+                >
+                    <ThumbsUp className={`w-4 h-4 ${isLiked ? 'fill-current' : ''}`} />
+                </button>
+            </div>
+            {variant !== 'profile' && (
+                <button
+                    onClick={() => onOpenModal(item)}
+                    className="w-8 h-8 border-2 border-gray-400 rounded-full flex items-center justify-center text-gray-400 hover:border-white hover:text-white transition-colors"
+                >
+                    <ChevronDown className="w-4 h-4" />
+                </button>
+            )}
+        </div>
+    );
+
+    const renderMedia = () => (
+        <div className={`relative w-full ${showTrailer && !isMobile ? 'aspect-video' : 'h-full'} bg-neutral-900 transition-all duration-300 overflow-hidden`}>
+            {/* Skeleton loader while image is fetching */}
+            {!imageLoaded && !showTrailer && (
+                <div className="absolute inset-0 bg-neutral-900 animate-pulse flex items-center justify-center">
+                    <div className="w-8 h-8 border-2 border-yellow-500/40 border-t-yellow-500 rounded-full animate-spin" />
+                </div>
+            )}
+
+            {showTrailer && !isMobile && trailer ? (
+                <iframe
+                    src={trailer.src}
+                    className="w-full h-full object-cover pointer-events-none scale-[1.50]"
+                    frameBorder="0"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                    title={item.title}
+                    referrerPolicy="strict-origin-when-cross-origin"
+                />
+            ) : (
+                <img
+                    src={shouldLoadImage ? posterSrc : undefined}
+                    alt={item.title}
+                    loading="lazy"
+                    decoding="async"
+                    onLoad={() => setImageLoaded(true)}
+                    onError={() => {
+                        setImageError(true);
+                        setImageLoaded(true);
+                    }}
+                    className="w-full h-full object-cover"
+                />
+            )}
+        </div>
+    );
+
+    if (isMobile) {
+        return (
+            <div
+                ref={cardRef}
+                className="group relative flex-none w-[140px] md:w-[200px] h-[210px] md:h-[300px] z-[0] hover:z-[999]"
+                onClick={() => onOpenModal(item)}
+            >
+                <div className="w-full h-full bg-[#181818] rounded-md shadow-xl overflow-hidden origin-center absolute top-0 left-0">
+                    {renderMedia()}
+                    {variant === 'profile' && (
+                        <div className="p-4 absolute inset-0 bg-black/80 flex flex-col justify-center items-center gap-4">
+                            {renderActionButtons()}
+                        </div>
+                    )}
+                </div>
+            </div>
+        );
+    }
+
     return (
         <div
             ref={cardRef}
@@ -150,38 +244,7 @@ function SeriesCard({ item, onOpenModal, isFirst, isLast, variant = 'default' }:
                 transition={{ duration: 0.3, ease: 'easeInOut' }}
             >
                 {/* Media Container */}
-                <div className={`relative w-full ${showTrailer && !isMobile ? 'aspect-video' : 'h-full'} bg-neutral-900 transition-all duration-300 overflow-hidden`}>
-                    {/* Skeleton loader while image is fetching */}
-                    {!imageLoaded && !showTrailer && (
-                        <div className="absolute inset-0 bg-neutral-900 animate-pulse flex items-center justify-center">
-                            <div className="w-8 h-8 border-2 border-yellow-500/40 border-t-yellow-500 rounded-full animate-spin" />
-                        </div>
-                    )}
-
-                    {showTrailer && !isMobile && trailer ? (
-                        <iframe
-                            src={trailer.src}
-                            className="w-full h-full object-cover pointer-events-none scale-[1.50]"
-                            frameBorder="0"
-                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                            title={item.title}
-                            referrerPolicy="strict-origin-when-cross-origin"
-                        />
-                    ) : (
-                        <img
-                            src={shouldLoadImage ? posterSrc : undefined}
-                            alt={item.title}
-                            loading="lazy"
-                            decoding="async"
-                            onLoad={() => setImageLoaded(true)}
-                            onError={() => {
-                                setImageError(true);
-                                setImageLoaded(true);
-                            }}
-                            className="w-full h-full object-cover"
-                        />
-                    )}
-                </div>
+                {renderMedia()}
 
                 {/* Info Content - Only shown when expanded or on hover in profile variant */}
                 <motion.div
@@ -191,43 +254,7 @@ function SeriesCard({ item, onOpenModal, isFirst, isLast, variant = 'default' }:
                     transition={{ duration: 0.2 }}
                 >
                     {/* Action Buttons */}
-                    <div className={`flex items-center ${variant === 'profile' ? 'justify-center gap-4 w-full' : 'justify-between mb-3'}`}>
-                        <div className="flex items-center gap-2">
-                            <button
-                                onClick={handlePlayClick}
-                                className="w-8 h-8 bg-white rounded-full flex items-center justify-center hover:bg-gray-200 transition-colors"
-                            >
-                                <Play className="w-4 h-4 fill-black text-black pl-0.5" />
-                            </button>
-                            <button
-                                onClick={handleToggleList}
-                                className={`w-8 h-8 border-2 rounded-full flex items-center justify-center transition-colors ${isInList
-                                    ? 'border-green-500 bg-green-500/10 text-green-500 hover:bg-green-500/20'
-                                    : 'border-gray-400 text-gray-400 hover:border-white hover:text-white'
-                                    }`}
-                                title={isInList ? "Remover da Lista" : "Adicionar à Lista"}
-                            >
-                                {isInList ? <Check className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
-                            </button>
-                            <button
-                                onClick={handleToggleLike}
-                                className={`w-8 h-8 border-2 rounded-full flex items-center justify-center transition-colors ${isLiked
-                                    ? 'border-[#E50914] bg-[#E50914]/10 text-[#E50914] hover:bg-[#E50914]/20'
-                                    : 'border-gray-400 text-gray-400 hover:border-white hover:text-white'
-                                    }`}
-                            >
-                                <ThumbsUp className={`w-4 h-4 ${isLiked ? 'fill-current' : ''}`} />
-                            </button>
-                        </div>
-                        {variant !== 'profile' && (
-                            <button
-                                onClick={() => onOpenModal(item)}
-                                className="w-8 h-8 border-2 border-gray-400 rounded-full flex items-center justify-center text-gray-400 hover:border-white hover:text-white transition-colors"
-                            >
-                                <ChevronDown className="w-4 h-4" />
-                            </button>
-                        )}
-                    </div>
+                    {renderActionButtons()}
 
                     {/* Metadata - Only for default variant */}
                     {variant !== 'profile' && (
