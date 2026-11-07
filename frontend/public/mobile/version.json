@@ -1,12 +1,10 @@
 {
-  "versionCode": 7,
-  "versionName": "1.0.6",
-  "apkUrl": "https://huaplay.playdb.info/downloads/huaplay/HuaPlay-1.0.6.apk",
-  "sha256": "c516788e3c8150451a3a3ca142afd9d74fe8a8ae856ea36e819f9ae929265788",
+  "versionCode": 8,
+  "versionName": "1.0.7",
+  "apkUrl": "https://huaplay.playdb.info/downloads/huaplay/HuaPlay-1.0.7.apk",
+  "sha256": "0a8a570038d193966f68c44a1eee62493356b090895d77c0f6f441fc16119357",
   "releaseNotes": [
-    "Correcao de perfis duplicados e protecao de dados por conta",
-    "Seletor legivel para reportar problemas e nova central de notificacoes",
-    "Permissao automatica de notificacoes no Android",
-    "Home com cache e navegacao mais rapida em celulares"
+    "Correcao da leitura do versionCode no atualizador nativo Android",
+    "Preserva os ajustes de navegacao, perfis, notificacoes e cache da versao 1.0.6"
   ]
 }
