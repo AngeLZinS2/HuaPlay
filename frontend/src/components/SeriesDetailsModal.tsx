@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Play, Plus, Check, ThumbsUp, X, Volume2, VolumeX } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
@@ -7,14 +7,16 @@ import { useAuth } from '../context/AuthContext';
 import { addToMyList, removeFromMyList, likeSeries, unlikeSeries } from '../services/userData';
 import { useToast } from '../context/ToastContext';
 import { useModal } from '../context/ModalContext';
-import { getTrailerEmbed } from '../utils/trailer';
+import { getYouTubeVideoId } from '../utils/youtube';
 import { getOptimizedImageUrl } from '../utils/image';
+import CompactHeroTrailer from './CompactHeroTrailer';
 
 export default function SeriesDetailsModal() {
     const { isOpen, content: selectedSeries, closeModal } = useModal();
     const [modalEpisodes, setModalEpisodes] = useState<any[]>([]);
     const [isMuted, setIsMuted] = useState(true);
-    const iframeRef = useRef<HTMLIFrameElement>(null);
+    const [trailerPlaying, setTrailerPlaying] = useState(false);
+    const [trailerFailed, setTrailerFailed] = useState(false);
     const navigate = useNavigate();
     const { uid, currentProfile, myListIds, myLikeIds, updateLists, isAuthenticated } = useAuth();
     const { addToast } = useToast();
@@ -22,9 +24,8 @@ export default function SeriesDetailsModal() {
     // Derived states
     const isInList = selectedSeries ? myListIds.includes(selectedSeries.id) : false;
     const isLiked = selectedSeries ? myLikeIds.includes(selectedSeries.id) : false;
-    // null whenever the link is missing or is not something we can embed, in
-    // which case the header falls back to the banner still.
-    const trailer = getTrailerEmbed(selectedSeries?.trailer_url);
+    const youtubeId = selectedSeries?.trailer_url ? getYouTubeVideoId(selectedSeries.trailer_url) : null;
+    const shouldMountTrailer = Boolean(isOpen && youtubeId && !trailerFailed);
     const description = selectedSeries?.description?.trim() || 'Sinopse não disponível.';
     const episodeDescription = description.length > 120 ? `${description.substring(0, 120)}...` : description;
 
@@ -33,10 +34,15 @@ export default function SeriesDetailsModal() {
         if (isOpen && selectedSeries) {
             fetchEpisodes(selectedSeries.id);
             setIsMuted(true);
+            setTrailerPlaying(false);
+            setTrailerFailed(false);
         } else {
             setModalEpisodes([]);
+            setIsMuted(true);
+            setTrailerPlaying(false);
+            setTrailerFailed(false);
         }
-    }, [isOpen, selectedSeries]);
+    }, [isOpen, selectedSeries?.id, selectedSeries?.trailer_url]);
 
     const fetchEpisodes = async (id: number) => {
         try {
@@ -46,18 +52,6 @@ export default function SeriesDetailsModal() {
             console.error("Failed to fetch episodes for modal:", error);
         }
     };
-
-    // Handle seamless audio toggle via postMessage for YouTube iframe
-    useEffect(() => {
-        if (iframeRef.current && iframeRef.current.contentWindow) {
-            const command = isMuted ? 'mute' : 'unMute';
-            iframeRef.current.contentWindow.postMessage(JSON.stringify({
-                'event': 'command',
-                'func': command,
-                'args': []
-            }), '*');
-        }
-    }, [isMuted]);
 
     const handleToggleList = async () => {
         if (!selectedSeries) return;
@@ -135,22 +129,24 @@ export default function SeriesDetailsModal() {
                         </button>
 
                         {/* Header Image Area */}
-                        <div className="relative aspect-video w-full">
-                            {trailer ? (
-                                <iframe
-                                    ref={iframeRef}
-                                    src={trailer.src}
+                        <div className="relative aspect-video w-full overflow-hidden">
+                            <img
+                                src={getOptimizedImageUrl(selectedSeries.banner || selectedSeries.banner_image || selectedSeries.image || selectedSeries.cover_image, 'backdrop')}
+                                alt={selectedSeries.title}
+                                className="w-full h-full object-cover"
+                            />
+                            {shouldMountTrailer && youtubeId && (
+                                <CompactHeroTrailer
+                                    key={`${selectedSeries.id}-${selectedSeries.trailer_url}`}
+                                    videoId={youtubeId}
                                     title={selectedSeries.title}
-                                    className="w-full h-full object-cover pointer-events-none"
-                                    frameBorder="0"
-                                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                                    referrerPolicy="strict-origin-when-cross-origin"
-                                />
-                            ) : (
-                                <img
-                                    src={getOptimizedImageUrl(selectedSeries.banner || selectedSeries.banner_image || selectedSeries.image || selectedSeries.cover_image, 'backdrop')}
-                                    alt={selectedSeries.title}
-                                    className="w-full h-full object-cover"
+                                    isMuted={isMuted}
+                                    onPlayingChange={(playing) => setTrailerPlaying(playing)}
+                                    onMuteChange={(muted) => setIsMuted(muted)}
+                                    onFallback={() => {
+                                        setTrailerFailed(true);
+                                        setTrailerPlaying(false);
+                                    }}
                                 />
                             )}
                             <div className="absolute inset-0 bg-gradient-to-t from-[#0a0a0a] to-transparent pointer-events-none" />
@@ -181,9 +177,11 @@ export default function SeriesDetailsModal() {
                                 >
                                     <ThumbsUp className={`w-5 h-5 md:w-6 md:h-6 ${isLiked ? 'fill-current' : ''}`} />
                                 </button>
-                                {trailer?.supportsMuteApi && (
+                                {trailerPlaying && (
                                     <button
                                         onClick={() => setIsMuted(!isMuted)}
+                                        aria-label={isMuted ? 'Ativar som do trailer' : 'Silenciar trailer'}
+                                        title={isMuted ? 'Ativar som' : 'Silenciar'}
                                         className="ml-auto p-2 md:p-3 border border-white/20 rounded-full text-gray-300 hover:text-white bg-black/40 backdrop-blur-sm"
                                     >
                                         {isMuted ? <VolumeX className="w-5 h-5 md:w-6 md:h-6" /> : <Volume2 className="w-5 h-5 md:w-6 md:h-6" />}

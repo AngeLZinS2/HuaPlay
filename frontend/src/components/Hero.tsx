@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Play, Plus, Check, Volume2, VolumeX } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
@@ -6,7 +6,6 @@ import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { addToMyList, removeFromMyList } from '../services/userData';
 import { useToast } from '../context/ToastContext';
-import { getTrailerEmbed } from '../utils/trailer';
 import { getYouTubeVideoId } from '../utils/youtube';
 import { getOptimizedImageUrl } from '../utils/image';
 import { useHeroDeviceMode, type HeroDeviceMode } from '../hooks/useHeroDeviceMode';
@@ -197,13 +196,21 @@ export default function Hero({ initialFeatured, featuredPromise }: HeroProps = {
     const [loading, setLoading] = useState<boolean>(
         initialFeatured !== undefined ? !initialFeatured : true
     );
-    const [isMuted, setIsMuted] = useState(true);
+    const [desktopMuted, setDesktopMuted] = useState(true);
+    const [desktopPlaying, setDesktopPlaying] = useState(false);
+    const [desktopTrailerFailed, setDesktopTrailerFailed] = useState(false);
 
-    const iframeRef = useRef<HTMLIFrameElement>(null);
     const navigate = useNavigate();
     const heroMode = useHeroDeviceMode();
     const { uid, currentProfile, myListIds, updateLists, isAuthenticated } = useAuth();
     const { addToast } = useToast();
+
+    // Reset de estados desktop ao mudar conteúdo ou modo
+    useEffect(() => {
+        setDesktopMuted(true);
+        setDesktopPlaying(false);
+        setDesktopTrailerFailed(false);
+    }, [featured?.id, featured?.trailer_url, heroMode]);
 
     const isInList = featured ? myListIds.includes(Number(featured.id)) : false;
 
@@ -298,18 +305,6 @@ export default function Hero({ initialFeatured, featuredPromise }: HeroProps = {
         };
     }, [initialFeatured, featuredPromise]);
 
-    // Áudio do trailer Desktop via postMessage
-    useEffect(() => {
-        if (heroMode === 'desktop' && iframeRef.current && iframeRef.current.contentWindow) {
-            const command = isMuted ? 'mute' : 'unMute';
-            iframeRef.current.contentWindow.postMessage(JSON.stringify({
-                'event': 'command',
-                'func': command,
-                'args': []
-            }), '*');
-        }
-    }, [isMuted, featured, heroMode]);
-
     if (loading) {
         return <div className="relative h-screen w-full bg-black" />;
     }
@@ -363,36 +358,39 @@ export default function Hero({ initialFeatured, featuredPromise }: HeroProps = {
 
     // RENDERIZAÇÃO CONDICIONAL NO REACT: APENAS ÁRVORE COMPACTA OU DESKTOP
     if (heroMode === 'desktop') {
-        const trailer = getTrailerEmbed(featured.trailer_url, { hd: true });
-        const showsTrailer = Boolean(
-            trailer && (featured.feature_type === 'TRAILER' || !featured.feature_type),
+        const desktopYoutubeId = featured.trailer_url ? getYouTubeVideoId(featured.trailer_url) : null;
+        const shouldMountDesktopTrailer = Boolean(
+            desktopYoutubeId &&
+            featured.feature_type !== 'BANNER' &&
+            !desktopTrailerFailed
         );
 
         return (
             <div className="relative h-screen w-full overflow-hidden">
-                {/* Background Video/Image */}
+                {/* Background Video/Image: banner img SEMPRE como base */}
                 <div className="absolute inset-0 select-none pointer-events-none">
-                    {showsTrailer ? (
-                        <div className="relative w-full h-full overflow-hidden">
-                            <iframe
-                                ref={iframeRef}
-                                src={trailer?.src}
-                                title={featured.title}
-                                className="absolute top-1/2 left-1/2 w-[150vw] h-[150vh] -translate-x-1/2 -translate-y-1/2 pointer-events-none object-cover"
-                                frameBorder="0"
-                                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                                allowFullScreen
-                                referrerPolicy="strict-origin-when-cross-origin"
-                            />
-                        </div>
-                    ) : (
-                        <img
-                            src={getOptimizedImageUrl(featured.banner_image || featured.cover_image, 'backdrop')}
-                            alt={featured.title}
-                            decoding="async"
-                            className="w-full h-full object-cover"
+                    <img
+                        src={getOptimizedImageUrl(featured.banner_image || featured.cover_image, 'backdrop')}
+                        alt={featured.title}
+                        decoding="async"
+                        className="w-full h-full object-cover"
+                    />
+
+                    {shouldMountDesktopTrailer && desktopYoutubeId && (
+                        <CompactHeroTrailer
+                            key={`${featured.id}-${featured.trailer_url}`}
+                            videoId={desktopYoutubeId}
+                            title={featured.title}
+                            isMuted={desktopMuted}
+                            onPlayingChange={(playing) => setDesktopPlaying(playing)}
+                            onMuteChange={(muted) => setDesktopMuted(muted)}
+                            onFallback={() => {
+                                setDesktopTrailerFailed(true);
+                                setDesktopPlaying(false);
+                            }}
                         />
                     )}
+
                     {/* Cinematic Gradient Overlays */}
                     <div className="absolute inset-0 bg-black/30" />
                     <div className="absolute inset-0 bg-gradient-to-t from-[#050505] via-transparent to-transparent" />
@@ -459,15 +457,15 @@ export default function Hero({ initialFeatured, featuredPromise }: HeroProps = {
                     </motion.div>
                 </div>
 
-                {/* Mute toggle for Desktop Trailer */}
-                {showsTrailer && trailer?.supportsMuteApi && (
+                {/* Mute toggle for Desktop Trailer: somente quando reproduzindo */}
+                {desktopPlaying && (
                     <button
-                        onClick={() => setIsMuted(!isMuted)}
-                        aria-label={isMuted ? 'Ativar som do trailer' : 'Silenciar trailer'}
-                        title={isMuted ? 'Ativar som' : 'Silenciar'}
+                        onClick={() => setDesktopMuted(!desktopMuted)}
+                        aria-label={desktopMuted ? 'Ativar som do trailer' : 'Silenciar trailer'}
+                        title={desktopMuted ? 'Ativar som' : 'Silenciar'}
                         className="hidden md:flex absolute bottom-28 right-6 md:right-12 lg:right-20 z-20 items-center justify-center p-4 border border-white/10 rounded-full text-gray-400 hover:text-primary hover:border-primary/50 bg-black/60 backdrop-blur-md transition-all"
                     >
-                        {isMuted ? <VolumeX className="w-6 h-6" /> : <Volume2 className="w-6 h-6" />}
+                        {desktopMuted ? <VolumeX className="w-6 h-6" /> : <Volume2 className="w-6 h-6" />}
                     </button>
                 )}
             </div>

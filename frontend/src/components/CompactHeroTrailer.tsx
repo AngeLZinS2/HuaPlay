@@ -83,6 +83,7 @@ export const CompactHeroTrailer: React.FC<CompactHeroTrailerProps> = ({
     useEffect(() => {
         let isCancelled = false;
         let reachedPlaying = false;
+        let failed = false;
         let timeoutId: ReturnType<typeof setTimeout> | null = null;
         let playerInstance: YTPlayerInstance | null = null;
 
@@ -97,7 +98,12 @@ export const CompactHeroTrailer: React.FC<CompactHeroTrailerProps> = ({
         hostEl.appendChild(childMount);
 
         const triggerFallback = () => {
-            if (isCancelled) return;
+            if (isCancelled || failed) return;
+            failed = true;
+            if (timeoutId) {
+                clearTimeout(timeoutId);
+                timeoutId = null;
+            }
             setIsPlaying(false);
             onPlayingChangeRef.current?.(false);
             try {
@@ -115,17 +121,17 @@ export const CompactHeroTrailer: React.FC<CompactHeroTrailerProps> = ({
             onFallbackRef.current?.();
         };
 
-        // Timeout de ~10s: se NÃO atingir PLAYING (data: 1), força fallback mesmo que o player tenha sido criado
+        // Timeout terminal de 8000ms: se NÃO atingir PLAYING (data: 1), força fallback e desmonta sem áudio
         timeoutId = setTimeout(() => {
             if (!isCancelled && !reachedPlaying) {
                 triggerFallback();
             }
-        }, 10000);
+        }, 8000);
 
         loadYouTubeIframeApi()
             .then((yt) => {
-                // Se o componente foi desmontado enquanto o script carregava, aborta sem instanciar
-                if (isCancelled || !yt || !yt.Player || !childMount.parentNode) {
+                // Anti-race: se cancelado ou com falha terminal, bloqueia then e aborta criacao
+                if (isCancelled || failed || !yt || !yt.Player || !childMount.parentNode) {
                     return;
                 }
 
@@ -151,7 +157,7 @@ export const CompactHeroTrailer: React.FC<CompactHeroTrailerProps> = ({
                         },
                         events: {
                             onReady: (event: YTReadyEvent) => {
-                                if (isCancelled) return;
+                                if (isCancelled || failed) return;
                                 try {
                                     // Acessibilidade e atributos do iframe de background
                                     const iframe = event.target.getIframe?.();
@@ -171,7 +177,7 @@ export const CompactHeroTrailer: React.FC<CompactHeroTrailerProps> = ({
                                 }
                             },
                             onStateChange: (event: YTStateChangeEvent) => {
-                                if (isCancelled) return;
+                                if (isCancelled || failed) return;
                                 // 1 = YT.PlayerState.PLAYING
                                 if (event.data === 1) {
                                     reachedPlaying = true;
@@ -192,16 +198,33 @@ export const CompactHeroTrailer: React.FC<CompactHeroTrailerProps> = ({
                                     } catch {
                                         // Ignore
                                     }
+                                } else {
+                                    // Fora do data: 1 (PLAYING), garante isPlaying false e notifica false
+                                    setIsPlaying(false);
+                                    onPlayingChangeRef.current?.(false);
                                 }
                             },
                             onError: () => {
+                                if (isCancelled || failed) return;
                                 triggerFallback();
                             },
                             onAutoplayBlocked: () => {
+                                if (isCancelled || failed) return;
                                 triggerFallback();
                             },
                         },
                     });
+
+                    // Anti-race: se fallback disparou antes da atribuição da ref
+                    if (failed || isCancelled) {
+                        try {
+                            playerInstance.destroy();
+                            playerInstance = null;
+                        } catch {
+                            // Ignore
+                        }
+                        return;
+                    }
 
                     playerRef.current = playerInstance;
                 } catch {
@@ -209,6 +232,7 @@ export const CompactHeroTrailer: React.FC<CompactHeroTrailerProps> = ({
                 }
             })
             .catch(() => {
+                if (isCancelled || failed) return;
                 triggerFallback();
             });
 

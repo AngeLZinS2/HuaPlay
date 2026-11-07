@@ -4,7 +4,6 @@ import { Search, User, Menu, X, ChevronDown, Edit, Repeat, HelpCircle, Shield } 
 import { motion, AnimatePresence } from 'framer-motion';
 import SearchModal from './SearchModal';
 import { useAuth } from '../context/AuthContext';
-import LanguageSwitcher from './LanguageSwitcher';
 import NotificationBell from './NotificationBell';
 
 const navigation = [
@@ -20,8 +19,6 @@ const navigation = [
             { name: 'NOVELS', href: '/category/novels' },
         ]
     },
-    { name: 'EM BREVE', href: '/coming-soon' },
-    { name: 'DINASTIA CHINESA', href: '/collection/chinese-dynasty' },
     { name: 'ATRIZES', href: '/actresses' },
     { name: 'ATORES', href: '/actors' },
     {
@@ -163,7 +160,6 @@ export default function Navbar() {
 
                     {/* Icons */}
                     <div className="hidden md:flex items-center space-x-3">
-                        <LanguageSwitcher />
                         <button
                             className="text-gray-300 hover:text-white transition-colors"
                             onClick={() => setIsSearchOpen(true)}
