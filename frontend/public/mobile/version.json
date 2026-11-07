@@ -1,10 +1,12 @@
 {
-  "versionCode": 6,
-  "versionName": "1.0.5",
-  "apkUrl": "https://huaplay.playdb.info/downloads/huaplay/HuaPlay-1.0.5.apk",
-  "sha256": "7e325815c34d7279b1df61ac0d44fb393d76194d0f863b3f937b22695285b8f2",
+  "versionCode": 7,
+  "versionName": "1.0.6",
+  "apkUrl": "https://huaplay.playdb.info/downloads/huaplay/HuaPlay-1.0.6.apk",
+  "sha256": "c516788e3c8150451a3a3ca142afd9d74fe8a8ae856ea36e819f9ae929265788",
   "releaseNotes": [
-    "Correcao do fechamento ao iniciar no Android",
-    "Preservacao dos metadados de permissoes de notificacoes no APK otimizado"
+    "Correcao de perfis duplicados e protecao de dados por conta",
+    "Seletor legivel para reportar problemas e nova central de notificacoes",
+    "Permissao automatica de notificacoes no Android",
+    "Home com cache e navegacao mais rapida em celulares"
   ]
 }
