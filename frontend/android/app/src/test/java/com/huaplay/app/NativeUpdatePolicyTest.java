@@ -67,6 +67,41 @@ public class NativeUpdatePolicyTest {
     }
 
     @Test
+    public void testParseVersionCode() {
+        // Integer 7 e Long 7
+        assertEquals(Long.valueOf(7L), NativeUpdatePolicy.parseVersionCode(Integer.valueOf(7)));
+        assertEquals(Long.valueOf(7L), NativeUpdatePolicy.parseVersionCode(Long.valueOf(7L)));
+        assertEquals(Long.valueOf(Integer.MAX_VALUE), NativeUpdatePolicy.parseVersionCode(Integer.MAX_VALUE));
+        assertEquals(Long.valueOf(Integer.MAX_VALUE), NativeUpdatePolicy.parseVersionCode((long) Integer.MAX_VALUE));
+
+        // Ausente (null)
+        assertNull(NativeUpdatePolicy.parseVersionCode(null));
+
+        // Fracionário (Float e Double) não deve sofrer truncamento aceito
+        assertNull(NativeUpdatePolicy.parseVersionCode(7.0));
+        assertNull(NativeUpdatePolicy.parseVersionCode(7.5));
+        assertNull(NativeUpdatePolicy.parseVersionCode(7.0f));
+
+        // String
+        assertNull(NativeUpdatePolicy.parseVersionCode("7"));
+        assertNull(NativeUpdatePolicy.parseVersionCode(""));
+
+        // Booleano
+        assertNull(NativeUpdatePolicy.parseVersionCode(true));
+        assertNull(NativeUpdatePolicy.parseVersionCode(false));
+
+        // Zero e negativo
+        assertNull(NativeUpdatePolicy.parseVersionCode(0));
+        assertNull(NativeUpdatePolicy.parseVersionCode(0L));
+        assertNull(NativeUpdatePolicy.parseVersionCode(-1));
+        assertNull(NativeUpdatePolicy.parseVersionCode(-7L));
+
+        // Overflow (> Integer.MAX_VALUE)
+        assertNull(NativeUpdatePolicy.parseVersionCode(((long) Integer.MAX_VALUE) + 1L));
+        assertNull(NativeUpdatePolicy.parseVersionCode(Long.MAX_VALUE));
+    }
+
+    @Test
     public void testContentLengthValidation() {
         assertTrue(NativeUpdatePolicy.isContentLengthAcceptable(-1));
         assertTrue(NativeUpdatePolicy.isContentLengthAcceptable(1024));

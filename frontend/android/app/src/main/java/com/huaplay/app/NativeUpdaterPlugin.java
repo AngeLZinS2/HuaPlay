@@ -56,7 +56,8 @@ public class NativeUpdaterPlugin extends Plugin {
     @PluginMethod
     public void downloadUpdate(PluginCall call) {
         String url = call.getString("url");
-        Long rawVersionCode = call.getLong("versionCode");
+        Object rawVersionCodeObj = call.getData() != null ? call.getData().opt("versionCode") : null;
+        Long rawVersionCode = NativeUpdatePolicy.parseVersionCode(rawVersionCodeObj);
         String sha256 = call.getString("sha256");
 
         if (url == null || !NativeUpdatePolicy.isValidDownloadUrl(url)) {

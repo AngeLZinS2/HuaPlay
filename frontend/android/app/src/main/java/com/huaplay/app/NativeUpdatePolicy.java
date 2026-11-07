@@ -134,6 +134,27 @@ public final class NativeUpdatePolicy {
                 && targetVersionCode > currentVersionCode;
     }
 
+    public static Long parseVersionCode(Object raw) {
+        if (raw == null) {
+            return null;
+        }
+        if (raw instanceof Integer) {
+            int val = (Integer) raw;
+            if (val > 0) {
+                return (long) val;
+            }
+            return null;
+        }
+        if (raw instanceof Long) {
+            long val = (Long) raw;
+            if (val > 0 && val <= Integer.MAX_VALUE) {
+                return val;
+            }
+            return null;
+        }
+        return null;
+    }
+
     public static boolean isContentLengthAcceptable(long contentLength) {
         if (contentLength < 0) {
             // Unknown content length, stream will verify byte count
