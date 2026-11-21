@@ -118,8 +118,11 @@ export const getSeries = async (params?: SeriesQuery, signal?: AbortSignal): Pro
 };
 
 /** Same query, but also returns the X-Total-Count the backend already sends. */
-export const getSeriesPage = async (params?: SeriesQuery): Promise<{ items: Series[]; total: number }> => {
-    const response = await api.get<Series[]>('/series/', { params });
+export const getSeriesPage = async (
+    params?: SeriesQuery,
+    signal?: AbortSignal
+): Promise<{ items: Series[]; total: number }> => {
+    const response = await api.get<Series[]>('/series/', { params, signal });
     const total = Number(response.headers['x-total-count'] ?? response.data.length);
     return { items: response.data, total: Number.isNaN(total) ? response.data.length : total };
 };

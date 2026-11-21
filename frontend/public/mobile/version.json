@@ -1,10 +1,10 @@
 {
-  "versionCode": 10,
-  "versionName": "1.0.9",
-  "apkUrl": "https://huaplay.playdb.info/downloads/huaplay/HuaPlay-1.0.9.apk",
-  "sha256": "8128a92b2ec74036648f337ce2b336c18266ee1816743f4f30a4e1a72eadc2e9",
+  "versionCode": 11,
+  "versionName": "1.0.10",
+  "apkUrl": "https://huaplay.playdb.info/downloads/huaplay/HuaPlay-1.0.10.apk",
+  "sha256": "ae6e92e325d0c0b90ea8e62ad0db3e3b2b5c19c967b5fe730ed9af36c06f9cc2",
   "releaseNotes": [
-    "Correcao de responsividade e HUD do player Google Drive no mobile (APK e PWA)",
-    "Pixeldrain em modo embed limpo (?embed) com tela cheia liberada + tela cheia nativa em paisagem no Android"
+    "Novo layout Magazine & Barra Flutuante nas telas de Catalogo, Pesquisa e Cronograma (banner Spotlight, barra fixa em vidro fosco e cards com titulo/metadados legiveis)",
+    "Novos filtros de Ano e Ordenacao, chips removiveis, modo Grade/Lista, contagem real de obras e gaveta de filtros otimizada para mobile"
   ]
 }
