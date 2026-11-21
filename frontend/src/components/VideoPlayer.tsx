@@ -7,19 +7,27 @@ import {
     type YTPlayer,
 } from '../utils/youtubeApi';
 import { isPixeldrainUrl, toPixeldrainDirect } from '../utils/pixeldrain';
+import { PREFER_NATIVE_PIXELDRAIN } from '../config';
 
 interface VideoPlayerProps {
     embedUrl: string;
     placeholder?: string;
     /** Seconds to resume from. Honoured by the native player; YouTube uses ?start=. */
     resumeAt?: number;
-    /** Called periodically with the current position, and once when playback stops. */
-    onProgress?: (seconds: number) => void;
-    /** Called when the video reaches its end. */
+    /** Called periodically with the exact playback position, and when playback stops. */
+    onProgress?: (seconds: number, duration?: number) => void;
+    /** Called when the video reaches its end (or >= 92% completion on exact players). */
     onEnded?: () => void;
+    /** Tells parent whether this source reports exact player time or needs wall-clock estimation. */
+    onPlaybackModeChange?: (mode: 'exact' | 'estimated') => void;
+    /** Fired when the user clicks/focuses the player (including inside cross-origin iframes). */
+    onUserInteract?: () => void;
+    /** Subtle golden frame highlight when Cinema Mode is enabled. */
+    cinemaMode?: boolean;
 }
 
-const PROGRESS_INTERVAL_MS = 30_000;
+const PROGRESS_INTERVAL_MS = 15_000;
+const COMPLETE_RATIO = 0.92;
 
 export default function VideoPlayer({
     embedUrl,
@@ -27,19 +35,26 @@ export default function VideoPlayer({
     resumeAt = 0,
     onProgress,
     onEnded,
+    onPlaybackModeChange,
+    onUserInteract,
+    cinemaMode = false,
 }: VideoPlayerProps) {
     const frameId = `yt-${useId().replace(/:/g, '')}`;
     const playerRef = useRef<YTPlayer | null>(null);
+    const iframeRef = useRef<HTMLIFrameElement>(null);
 
-    // Keep the latest callbacks in refs so the player is not torn down and
-    // rebuilt every time the parent re-renders with new closures. Written in an
-    // effect rather than during render, which React forbids.
+    // Keep latest callbacks in refs so the player is never torn down on parent re-renders.
     const onProgressRef = useRef(onProgress);
     const onEndedRef = useRef(onEnded);
+    const onPlaybackModeChangeRef = useRef(onPlaybackModeChange);
+    const onUserInteractRef = useRef(onUserInteract);
+
     useEffect(() => {
         onProgressRef.current = onProgress;
         onEndedRef.current = onEnded;
-    }, [onProgress, onEnded]);
+        onPlaybackModeChangeRef.current = onPlaybackModeChange;
+        onUserInteractRef.current = onUserInteract;
+    }, [onProgress, onEnded, onPlaybackModeChange, onUserInteract]);
 
     // Helper to format Google Drive URLs for embedding
     const getEmbedUrl = (url: string) => {
@@ -51,63 +66,131 @@ export default function VideoPlayer({
     };
 
     const resolvedUrl = getEmbedUrl(embedUrl);
-    const nativeSrc = isPixeldrainUrl(resolvedUrl) ? toPixeldrainDirect(resolvedUrl) : null;
+    const nativeSrc =
+        PREFER_NATIVE_PIXELDRAIN && isPixeldrainUrl(resolvedUrl)
+            ? toPixeldrainDirect(resolvedUrl)
+            : null;
     const trackable = isYouTubeEmbed(resolvedUrl) && !nativeSrc;
     const srcUrl = trackable ? withJsApi(resolvedUrl) : resolvedUrl;
 
-    // ---- native <video> path (Pixeldrain) ----
+    // ---- native <video> path (when PREFER_NATIVE_PIXELDRAIN is enabled) ----
     const videoRef = useRef<HTMLVideoElement>(null);
     const lastReportedRef = useRef(0);
-    // Remember which source failed rather than a bare boolean: a different source
-    // is then automatically a fresh attempt, with no effect resetting state.
+    const autoCompletedSrcRef = useRef<string | null>(null);
     const [failedSrc, setFailedSrc] = useState<string | null>(null);
 
-    const reportNative = useCallback((force = false) => {
-        const el = videoRef.current;
-        if (!el) return;
-        const seconds = Math.floor(el.currentTime);
-        // timeupdate fires several times a second; only persist every 30s of
-        // playback, plus on pause/unmount/end where force is set.
-        if (!force && Math.abs(seconds - lastReportedRef.current) < 30) return;
-        lastReportedRef.current = seconds;
-        if (seconds > 0) onProgressRef.current?.(seconds);
-    }, []);
+    const isNativeActive = Boolean(nativeSrc && failedSrc !== nativeSrc);
+    const isExactMode = isNativeActive || trackable;
 
-    // Seek to the saved position once the browser knows the duration.
+    useEffect(() => {
+        onPlaybackModeChangeRef.current?.(isExactMode ? 'exact' : 'estimated');
+    }, [isExactMode, resolvedUrl]);
+
+    // Detect when the viewer clicks Play inside a cross-origin iframe (Drive, Pixeldrain, Mega).
+    // Clicking inside an iframe blurs the parent window and moves document.activeElement to the iframe.
+    useEffect(() => {
+        if (isNativeActive || !srcUrl) return;
+        const handleBlur = () => {
+            const checkFocus = () => {
+                if (iframeRef.current && document.activeElement === iframeRef.current) {
+                    onUserInteractRef.current?.();
+                }
+            };
+            checkFocus();
+            window.setTimeout(checkFocus, 0);
+        };
+        window.addEventListener('blur', handleBlur);
+        return () => window.removeEventListener('blur', handleBlur);
+    }, [isNativeActive, srcUrl]);
+
+    const reportNative = useCallback(
+        (force = false) => {
+            const el = videoRef.current;
+            if (!el) return;
+            const seconds = Math.floor(el.currentTime);
+            const duration = Number.isFinite(el.duration) ? Math.floor(el.duration) : undefined;
+
+            if (
+                duration &&
+                duration > 60 &&
+                seconds / duration >= COMPLETE_RATIO &&
+                autoCompletedSrcRef.current !== nativeSrc
+            ) {
+                autoCompletedSrcRef.current = nativeSrc;
+                onEndedRef.current?.();
+                return;
+            }
+
+            if (!force && Math.abs(seconds - lastReportedRef.current) < 15) return;
+            lastReportedRef.current = seconds;
+            if (seconds > 0) onProgressRef.current?.(seconds, duration);
+        },
+        [nativeSrc],
+    );
+
+    // Seek to saved position once metadata loads.
     useEffect(() => {
         const el = videoRef.current;
-        if (!el || !nativeSrc || resumeAt <= 0) return;
+        if (!el || !isNativeActive || resumeAt <= 0) return;
         const seek = () => {
-            if (resumeAt < el.duration - 5) el.currentTime = resumeAt;
+            if (Number.isFinite(el.duration) && resumeAt < el.duration - 5) {
+                el.currentTime = resumeAt;
+            }
         };
         if (el.readyState >= 1) seek();
         else el.addEventListener('loadedmetadata', seek, { once: true });
         return () => el.removeEventListener('loadedmetadata', seek);
-    }, [nativeSrc, resumeAt]);
+    }, [isNativeActive, nativeSrc, resumeAt]);
 
-    // Persist wherever the viewer stopped when the source changes or unmounts.
+    // Persist native playback position on source change, hide, or unmount.
     useEffect(() => {
-        if (!nativeSrc) return;
+        if (!isNativeActive) return;
         lastReportedRef.current = 0;
-        return () => reportNative(true);
-    }, [nativeSrc, reportNative]);
+        const onHide = () => {
+            if (document.visibilityState === 'hidden') reportNative(true);
+        };
+        const onPageHide = () => reportNative(true);
+        document.addEventListener('visibilitychange', onHide);
+        window.addEventListener('pagehide', onPageHide);
+        return () => {
+            document.removeEventListener('visibilitychange', onHide);
+            window.removeEventListener('pagehide', onPageHide);
+            reportNative(true);
+        };
+    }, [isNativeActive, nativeSrc, reportNative]);
 
+    // ---- YouTube IFrame API path ----
     useEffect(() => {
         if (!trackable) return;
 
         let cancelled = false;
         let ticker: ReturnType<typeof setInterval> | undefined;
+        let completedSent = false;
 
         const report = () => {
             const player = playerRef.current;
             if (!player) return;
             try {
                 const seconds = Math.floor(player.getCurrentTime());
-                if (seconds > 0) onProgressRef.current?.(seconds);
+                const rawDuration = player.getDuration();
+                const duration = Number.isFinite(rawDuration) && rawDuration > 0 ? Math.floor(rawDuration) : undefined;
+
+                if (duration && duration > 60 && seconds / duration >= COMPLETE_RATIO && !completedSent) {
+                    completedSent = true;
+                    onEndedRef.current?.();
+                    return;
+                }
+                if (seconds > 0) onProgressRef.current?.(seconds, duration);
             } catch {
-                // Player torn down mid-call; nothing useful to do.
+                // Player torn down mid-call
             }
         };
+
+        const onHide = () => {
+            if (document.visibilityState === 'hidden') report();
+        };
+        document.addEventListener('visibilitychange', onHide);
+        window.addEventListener('pagehide', report);
 
         loadYouTubeApi()
             .then((YT) => {
@@ -119,16 +202,16 @@ export default function VideoPlayer({
                     events: {
                         onStateChange: (event) => {
                             if (event.data === YT_STATE.PLAYING) {
+                                onUserInteractRef.current?.();
                                 clearInterval(ticker);
                                 ticker = setInterval(report, PROGRESS_INTERVAL_MS);
                             } else {
                                 clearInterval(ticker);
                                 ticker = undefined;
-                                // Capture the position on pause too, not only on a timer tick.
                                 if (event.data === YT_STATE.PAUSED) report();
                             }
-                            if (event.data === YT_STATE.ENDED) {
-                                report();
+                            if (event.data === YT_STATE.ENDED && !completedSent) {
+                                completedSent = true;
                                 onEndedRef.current?.();
                             }
                         },
@@ -136,14 +219,14 @@ export default function VideoPlayer({
                 });
             })
             .catch((err) => {
-                // Progress tracking is an enhancement — the iframe still plays without it.
                 console.warn('YouTube progress tracking unavailable:', err);
             });
 
         return () => {
             cancelled = true;
             clearInterval(ticker);
-            // Save wherever the viewer stopped before the player goes away.
+            document.removeEventListener('visibilitychange', onHide);
+            window.removeEventListener('pagehide', report);
             report();
             try {
                 playerRef.current?.destroy();
@@ -154,11 +237,15 @@ export default function VideoPlayer({
         };
     }, [srcUrl, trackable, frameId]);
 
-    // If the native element cannot play the file, fall back to the provider's own
-    // iframe rather than leaving the viewer staring at a grey rectangle.
-    if (nativeSrc && failedSrc !== nativeSrc) {
+    const frameClasses = `relative w-full aspect-video bg-black rounded-2xl overflow-hidden border transition-all duration-300 ${
+        cinemaMode
+            ? 'border-primary/40 shadow-[0_0_80px_-15px_rgba(212,175,55,0.28),0_25px_60px_-12px_rgba(0,0,0,0.95)]'
+            : 'border-white/10 shadow-[0_20px_60px_-15px_rgba(0,0,0,0.85)]'
+    }`;
+
+    if (isNativeActive && nativeSrc) {
         return (
-            <div className="relative w-full aspect-video bg-black rounded-lg overflow-hidden border border-gray-800 shadow-2xl">
+            <div className={frameClasses} onPointerDown={() => onUserInteractRef.current?.()}>
                 <video
                     ref={videoRef}
                     key={nativeSrc}
@@ -167,10 +254,12 @@ export default function VideoPlayer({
                     playsInline
                     preload="metadata"
                     className="w-full h-full bg-black"
+                    onPlay={() => onUserInteractRef.current?.()}
                     onTimeUpdate={() => reportNative()}
+                    onSeeked={() => reportNative(true)}
                     onPause={() => reportNative(true)}
                     onEnded={() => {
-                        reportNative(true);
+                        autoCompletedSrcRef.current = nativeSrc;
                         onEndedRef.current?.();
                     }}
                     onError={() => {
@@ -187,9 +276,10 @@ export default function VideoPlayer({
     }
 
     return (
-        <div className="relative w-full aspect-video bg-black rounded-lg overflow-hidden border border-gray-800 shadow-2xl">
+        <div className={frameClasses} onPointerDown={() => onUserInteractRef.current?.()}>
             {srcUrl ? (
                 <iframe
+                    ref={iframeRef}
                     id={frameId}
                     key={srcUrl}
                     src={srcUrl}
@@ -199,8 +289,8 @@ export default function VideoPlayer({
                     allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                 />
             ) : (
-                <div className="w-full h-full flex items-center justify-center text-gray-500 bg-black/50">
-                    <p className="text-center px-4">{placeholder}</p>
+                <div className="w-full h-full flex flex-col items-center justify-center gap-2 text-gray-400 bg-gradient-to-b from-[#0d0d12] to-[#050507] px-6">
+                    <p className="text-center text-sm max-w-md leading-relaxed">{placeholder}</p>
                 </div>
             )}
         </div>

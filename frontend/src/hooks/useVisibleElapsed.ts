@@ -1,52 +1,145 @@
 import { useCallback, useEffect, useRef } from 'react';
 
+export interface UseVisibleElapsedOptions {
+    /** Hard upper bound (in seconds) so a forgotten tab never stores absurd values. */
+    maxSeconds?: number;
+    /** Fired right as the tab is hidden or unloaded (pagehide) while running. */
+    onPauseFlush?: (seconds: number) => void;
+}
+
 /**
- * Accumulates wall-clock time while the tab is actually in front.
+ * Accumulates wall-clock playback time while the tab is visible and watching
+ * has started — the fallback for iframe providers (Drive, Pixeldrain embed,
+ * Mega) that expose no player time API.
  *
- * This is the fallback for providers whose players expose no API (Pixeldrain,
- * Drive, Mega): we cannot know the real playback position, so we approximate it
- * by how long the viewer sat on the page with an episode selected. Counting
- * pauses when the tab is hidden, and the total is capped, but a viewer who
- * walks away with the tab open will still overshoot — which is exactly why the
- * value is stored as is_estimated and shown with a "~" in the UI.
+ * Key safeguards:
+ * - Explicit start/pause/reset so Episode 1 starts cleanly on interaction
+ *   and doesn't tick while the viewer is still reading the synopsis.
+ * - Single-tick delta is capped at 120s so waking a sleeping laptop/phone
+ *   cannot add hours of fake progress.
+ * - Immediately flushes via `onPauseFlush` on `visibilitychange` (hidden) and
+ *   `pagehide` so closing a mobile PWA or switching apps never drops progress.
  */
-export function useVisibleElapsed(maxSeconds = 4 * 60 * 60) {
+export function useVisibleElapsed(options: number | UseVisibleElapsedOptions = {}) {
+    const resolvedOptions: UseVisibleElapsedOptions =
+        typeof options === 'number' ? { maxSeconds: options } : options;
+    const maxSeconds = resolvedOptions.maxSeconds ?? 3 * 60 * 60;
+
     const accumulatedRef = useRef(0);
     const lastTickRef = useRef<number | null>(null);
+    const runningRef = useRef(false);
+    const onPauseFlushRef = useRef(resolvedOptions.onPauseFlush);
+
+    useEffect(() => {
+        onPauseFlushRef.current = resolvedOptions.onPauseFlush;
+    }, [resolvedOptions.onPauseFlush]);
+
+    const clamp = useCallback(
+        (value: number) => Math.min(maxSeconds, Math.max(0, value)),
+        [maxSeconds],
+    );
 
     const settle = useCallback(() => {
-        if (lastTickRef.current === null) return;
-        const delta = (Date.now() - lastTickRef.current) / 1000;
-        lastTickRef.current = Date.now();
-        if (delta > 0) {
-            accumulatedRef.current = Math.min(maxSeconds, accumulatedRef.current + delta);
+        if (!runningRef.current || lastTickRef.current === null) {
+            return Math.floor(accumulatedRef.current);
         }
-    }, [maxSeconds]);
+        const now = Date.now();
+        const rawDelta = (now - lastTickRef.current) / 1000;
+        lastTickRef.current = now;
+        if (rawDelta > 0) {
+            // Cap a single jump to 2 minutes to guard against OS sleep/suspend.
+            const safeDelta = Math.min(rawDelta, 120);
+            accumulatedRef.current = clamp(accumulatedRef.current + safeDelta);
+        }
+        return Math.floor(accumulatedRef.current);
+    }, [clamp]);
 
     /** Current accumulated seconds, in whole seconds. */
-    const elapsed = useCallback(() => {
-        settle();
-        return Math.floor(accumulatedRef.current);
+    const elapsed = useCallback(() => settle(), [settle]);
+
+    /** Begin or resume counting, optionally seeding from a saved timestamp. */
+    const start = useCallback(
+        (startAt?: number) => {
+            if (typeof startAt === 'number' && Number.isFinite(startAt)) {
+                accumulatedRef.current = clamp(startAt);
+            }
+            runningRef.current = true;
+            lastTickRef.current =
+                typeof document === 'undefined' || document.visibilityState === 'visible'
+                    ? Date.now()
+                    : null;
+        },
+        [clamp],
+    );
+
+    /** Pause counting and return the latest accumulated seconds. */
+    const pause = useCallback(() => {
+        const total = settle();
+        runningRef.current = false;
+        lastTickRef.current = null;
+        return total;
     }, [settle]);
 
-    /** Restart counting, optionally carrying a previously saved position forward. */
-    const reset = useCallback((startAt = 0) => {
-        accumulatedRef.current = Math.min(maxSeconds, Math.max(0, startAt));
-        lastTickRef.current = document.visibilityState === 'visible' ? Date.now() : null;
-    }, [maxSeconds]);
+    /** Reset counter to `startAt` (default 0) and optionally start immediately. */
+    const reset = useCallback(
+        (startAt = 0, autoStart = false) => {
+            accumulatedRef.current = clamp(startAt);
+            runningRef.current = autoStart;
+            lastTickRef.current =
+                autoStart &&
+                (typeof document === 'undefined' || document.visibilityState === 'visible')
+                    ? Date.now()
+                    : null;
+        },
+        [clamp],
+    );
+
+    /**
+     * Raise the counter if Firestore finishes loading a higher saved position
+     * after the episode already mounted (prevents Ep. 1 async race overwrites).
+     */
+    const syncFloor = useCallback(
+        (savedSeconds: number) => {
+            settle();
+            if (Number.isFinite(savedSeconds) && savedSeconds > accumulatedRef.current) {
+                accumulatedRef.current = clamp(savedSeconds);
+            }
+        },
+        [clamp, settle],
+    );
+
+    const isRunning = useCallback(() => runningRef.current, []);
 
     useEffect(() => {
         const onVisibility = () => {
             if (document.visibilityState === 'visible') {
-                lastTickRef.current = Date.now();
+                if (runningRef.current) {
+                    lastTickRef.current = Date.now();
+                }
             } else {
-                settle();
+                const total = settle();
                 lastTickRef.current = null;
+                if (runningRef.current) {
+                    onPauseFlushRef.current?.(total);
+                }
             }
         };
+
+        const onPageHide = () => {
+            const total = settle();
+            lastTickRef.current = null;
+            if (runningRef.current) {
+                onPauseFlushRef.current?.(total);
+            }
+        };
+
         document.addEventListener('visibilitychange', onVisibility);
-        return () => document.removeEventListener('visibilitychange', onVisibility);
+        window.addEventListener('pagehide', onPageHide);
+        return () => {
+            document.removeEventListener('visibilitychange', onVisibility);
+            window.removeEventListener('pagehide', onPageHide);
+        };
     }, [settle]);
 
-    return { elapsed, reset };
+    return { elapsed, start, pause, reset, syncFloor, isRunning };
 }
