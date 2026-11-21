@@ -21,3 +21,9 @@ export function toPixeldrainDirect(url: string | null | undefined): string | nul
     const id = getPixeldrainId(url);
     return id ? `https://pixeldrain.com/api/file/${id}` : null;
 }
+
+/** Clean embeddable viewer URL (?embed hides Pixeldrain's top bar and sidebar). */
+export function toPixeldrainEmbed(url: string | null | undefined): string | null {
+    const id = getPixeldrainId(url);
+    return id ? `https://pixeldrain.com/u/${id}?embed` : null;
+}

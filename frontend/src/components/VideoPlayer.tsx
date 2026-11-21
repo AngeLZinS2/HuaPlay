@@ -6,7 +6,7 @@ import {
     YT_STATE,
     type YTPlayer,
 } from '../utils/youtubeApi';
-import { isPixeldrainUrl, toPixeldrainDirect } from '../utils/pixeldrain';
+import { isPixeldrainUrl, toPixeldrainDirect, toPixeldrainEmbed } from '../utils/pixeldrain';
 import { PREFER_NATIVE_PIXELDRAIN } from '../config';
 
 interface VideoPlayerProps {
@@ -24,6 +24,8 @@ interface VideoPlayerProps {
     onUserInteract?: () => void;
     /** Subtle golden frame highlight when Cinema Mode is enabled. */
     cinemaMode?: boolean;
+    /** True when the enclosing stage is in fullscreen / immersive overlay mode. */
+    isFullscreen?: boolean;
 }
 
 const PROGRESS_INTERVAL_MS = 15_000;
@@ -38,6 +40,7 @@ export default function VideoPlayer({
     onPlaybackModeChange,
     onUserInteract,
     cinemaMode = false,
+    isFullscreen = false,
 }: VideoPlayerProps) {
     const frameId = `yt-${useId().replace(/:/g, '')}`;
     const playerRef = useRef<YTPlayer | null>(null);
@@ -56,19 +59,23 @@ export default function VideoPlayer({
         onUserInteractRef.current = onUserInteract;
     }, [onProgress, onEnded, onPlaybackModeChange, onUserInteract]);
 
-    // Helper to format Google Drive URLs for embedding
+    // Format provider URLs into clean embeddable player URLs
     const getEmbedUrl = (url: string) => {
         if (!url) return '';
         if (url.includes('drive.google.com') && (url.includes('/view') || url.includes('/edit'))) {
             return url.replace(/\/view.*$/, '/preview').replace(/\/edit.*$/, '/preview');
         }
+        if (isPixeldrainUrl(url)) {
+            return toPixeldrainEmbed(url) || url;
+        }
         return url;
     };
 
     const resolvedUrl = getEmbedUrl(embedUrl);
+    const isDriveEmbed = resolvedUrl.includes('drive.google.com');
     const nativeSrc =
-        PREFER_NATIVE_PIXELDRAIN && isPixeldrainUrl(resolvedUrl)
-            ? toPixeldrainDirect(resolvedUrl)
+        PREFER_NATIVE_PIXELDRAIN && isPixeldrainUrl(embedUrl)
+            ? toPixeldrainDirect(embedUrl)
             : null;
     const trackable = isYouTubeEmbed(resolvedUrl) && !nativeSrc;
     const srcUrl = trackable ? withJsApi(resolvedUrl) : resolvedUrl;
@@ -237,11 +244,19 @@ export default function VideoPlayer({
         };
     }, [srcUrl, trackable, frameId]);
 
-    const frameClasses = `relative w-full aspect-video bg-black rounded-2xl overflow-hidden border transition-all duration-300 ${
-        cinemaMode
-            ? 'border-primary/40 shadow-[0_0_80px_-15px_rgba(212,175,55,0.28),0_25px_60px_-12px_rgba(0,0,0,0.95)]'
-            : 'border-white/10 shadow-[0_20px_60px_-15px_rgba(0,0,0,0.85)]'
-    }`;
+    // Edge-to-edge on mobile so Drive's /preview HUD has full width & adequate height
+    // without clipping controls; keeps rounded luxury Cinema frame on sm+ / desktop.
+    const mobileSizing = isDriveEmbed
+        ? 'h-[265px] sm:h-auto sm:aspect-video'
+        : 'aspect-video min-h-[225px] sm:min-h-0';
+
+    const frameClasses = isFullscreen
+        ? 'relative w-full h-full bg-black overflow-hidden'
+        : `relative -mx-4 w-[calc(100%+2rem)] sm:mx-0 sm:w-full ${mobileSizing} bg-black rounded-none sm:rounded-2xl overflow-hidden border-y sm:border transition-all duration-300 ${
+              cinemaMode
+                  ? 'border-primary/40 shadow-[0_0_80px_-15px_rgba(212,175,55,0.28),0_25px_60px_-12px_rgba(0,0,0,0.95)]'
+                  : 'border-white/10 shadow-[0_20px_60px_-15px_rgba(0,0,0,0.85)]'
+          }`;
 
     if (isNativeActive && nativeSrc) {
         return (
@@ -253,7 +268,7 @@ export default function VideoPlayer({
                     controls
                     playsInline
                     preload="metadata"
-                    className="w-full h-full bg-black"
+                    className="block w-full h-full bg-black"
                     onPlay={() => onUserInteractRef.current?.()}
                     onTimeUpdate={() => reportNative()}
                     onSeeked={() => reportNative(true)}
@@ -283,10 +298,10 @@ export default function VideoPlayer({
                     id={frameId}
                     key={srcUrl}
                     src={srcUrl}
-                    className="w-full h-full"
-                    frameBorder="0"
+                    className="block w-full h-full border-0 bg-black"
                     allowFullScreen
-                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen; web-share"
+                    referrerPolicy="no-referrer-when-downgrade"
                 />
             ) : (
                 <div className="w-full h-full flex flex-col items-center justify-center gap-2 text-gray-400 bg-gradient-to-b from-[#0d0d12] to-[#050507] px-6">

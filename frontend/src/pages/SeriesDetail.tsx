@@ -46,7 +46,7 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import type { Episode, Series } from '../types/models';
-import { isPixeldrainUrl } from '../utils/pixeldrain';
+import { isPixeldrainUrl, toPixeldrainEmbed } from '../utils/pixeldrain';
 import { PREFER_NATIVE_PIXELDRAIN } from '../config';
 import { useVisibleElapsed } from '../hooks/useVisibleElapsed';
 import { getYouTubeEmbedUrl } from '../utils/youtube';
@@ -138,6 +138,8 @@ export default function SeriesDetail() {
 
     // UI states — Proposta 1 (Cinema Imersivo)
     const [cinemaMode, setCinemaMode] = useState(false);
+    const [isStageFullscreen, setIsStageFullscreen] = useState(false);
+    const [isPseudoFullscreen, setIsPseudoFullscreen] = useState(false);
     const [episodeViewMode, setEpisodeViewMode] = useState<'list' | 'grid'>('list');
     const [episodeSearch, setEpisodeSearch] = useState('');
     const [synopsisExpanded, setSynopsisExpanded] = useState(false);
@@ -160,6 +162,7 @@ export default function SeriesDetail() {
     const [liveSeconds, setLiveSeconds] = useState(0);
 
     const playerRef = useRef<HTMLDivElement>(null);
+    const playerStageRef = useRef<HTMLDivElement>(null);
     const trackedEpisodeRef = useRef<Episode | null>(null);
     const seriesRef = useRef<Series | null>(null);
     const progressRef = useRef<Record<number, WatchEntry>>({});
@@ -178,6 +181,76 @@ export default function SeriesDetail() {
     useEffect(() => {
         playbackModeRef.current = playbackMode;
     }, [playbackMode]);
+
+    // Track browser/WebView fullscreen state and unlock orientation on exit.
+    useEffect(() => {
+        const handleFullscreenChange = () => {
+            const doc = document as Document & { webkitFullscreenElement?: Element | null };
+            const active = Boolean(document.fullscreenElement || doc.webkitFullscreenElement);
+            setIsStageFullscreen(active);
+            if (!active) {
+                try {
+                    const orient = screen.orientation as ScreenOrientation & { unlock?: () => void };
+                    orient?.unlock?.();
+                } catch {
+                    // Orientation unlock not supported on this platform
+                }
+            }
+        };
+        document.addEventListener('fullscreenchange', handleFullscreenChange);
+        document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
+        return () => {
+            document.removeEventListener('fullscreenchange', handleFullscreenChange);
+            document.removeEventListener('webkitfullscreenchange', handleFullscreenChange);
+        };
+    }, []);
+
+    const handleToggleStageFullscreen = async () => {
+        if (isPseudoFullscreen) {
+            setIsPseudoFullscreen(false);
+            return;
+        }
+        const doc = document as Document & {
+            webkitFullscreenElement?: Element | null;
+            webkitExitFullscreen?: () => Promise<void> | void;
+        };
+        if (document.fullscreenElement || doc.webkitFullscreenElement) {
+            try {
+                if (document.exitFullscreen) await document.exitFullscreen();
+                else if (doc.webkitExitFullscreen) await doc.webkitExitFullscreen();
+            } catch {
+                // Ignore fullscreen exit error
+            }
+            return;
+        }
+
+        const el = playerStageRef.current as
+            | (HTMLDivElement & { webkitRequestFullscreen?: () => Promise<void> | void })
+            | null;
+        if (!el) return;
+
+        try {
+            if (el.requestFullscreen) {
+                await el.requestFullscreen();
+                try {
+                    const orient = screen.orientation as ScreenOrientation & {
+                        lock?: (orientation: string) => Promise<void>;
+                    };
+                    await orient?.lock?.('landscape');
+                } catch {
+                    // Orientation lock optional
+                }
+                return;
+            }
+            if (el.webkitRequestFullscreen) {
+                await el.webkitRequestFullscreen();
+                return;
+            }
+        } catch {
+            // Fall back to full-viewport overlay (e.g. iOS Safari)
+        }
+        setIsPseudoFullscreen(true);
+    };
 
     // Safe history writer: preserves optimistic Timestamp for sorting and prevents
     // accidental 0-second overwrites when clicking "Assistir" or switching back to an episode.
@@ -315,7 +388,7 @@ export default function SeriesDetail() {
                 return url;
             }
             if (type === 'pixeldrain') {
-                return url;
+                return toPixeldrainEmbed(url) || url;
             }
             if (type === 'mega') {
                 if (url.includes('/file/')) return url.replace('/file/', '/embed/');
@@ -1243,30 +1316,53 @@ export default function SeriesDetail() {
                                     )}
                                 </div>
 
-                                {/* Video Player */}
-                                <VideoPlayer
-                                    embedUrl={withResume(
-                                        useAlternativeLink
-                                            ? selectedEpisode.embed_url_2 || activeSource
-                                            : activeSource,
-                                        selectedEpisode,
+                                {/* Video Player Stage (supports native Fullscreen + iOS overlay fallback) */}
+                                <div
+                                    ref={playerStageRef}
+                                    className={
+                                        isPseudoFullscreen
+                                            ? 'fixed inset-0 z-[250] bg-black flex flex-col justify-center'
+                                            : isStageFullscreen
+                                                ? 'w-full h-full bg-black flex flex-col justify-center'
+                                                : 'relative'
+                                    }
+                                >
+                                    {isPseudoFullscreen && (
+                                        <button
+                                            type="button"
+                                            onClick={() => setIsPseudoFullscreen(false)}
+                                            aria-label="Sair da tela cheia"
+                                            style={{ top: 'calc(env(safe-area-inset-top, 0px) + 0.75rem)' }}
+                                            className="absolute right-3 z-20 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-black/75 border border-white/20 text-xs font-semibold text-white backdrop-blur-md"
+                                        >
+                                            <X className="w-4 h-4" /> Sair
+                                        </button>
                                     )}
-                                    placeholder="Este episódio não tem reprodutor embutido. Utilize os links de download abaixo."
-                                    resumeAt={resumeSecondsFor(selectedEpisode)}
-                                    cinemaMode={cinemaMode}
-                                    onPlaybackModeChange={(mode) => {
-                                        setPlaybackMode(mode);
-                                        if (mode === 'exact' && isElapsedRunning()) {
-                                            pauseElapsed();
-                                            setIsTracking(false);
-                                        }
-                                    }}
-                                    onUserInteract={() => {
-                                        armEstimatedTracking(selectedEpisode);
-                                    }}
-                                    onProgress={(seconds) => recordHistory(selectedEpisode, seconds, false, false)}
-                                    onEnded={() => recordHistory(selectedEpisode, 0, true, false)}
-                                />
+                                    <VideoPlayer
+                                        embedUrl={withResume(
+                                            useAlternativeLink
+                                                ? selectedEpisode.embed_url_2 || activeSource
+                                                : activeSource,
+                                            selectedEpisode,
+                                        )}
+                                        placeholder="Este episódio não tem reprodutor embutido. Utilize os links de download abaixo."
+                                        resumeAt={resumeSecondsFor(selectedEpisode)}
+                                        cinemaMode={cinemaMode}
+                                        isFullscreen={isStageFullscreen || isPseudoFullscreen}
+                                        onPlaybackModeChange={(mode) => {
+                                            setPlaybackMode(mode);
+                                            if (mode === 'exact' && isElapsedRunning()) {
+                                                pauseElapsed();
+                                                setIsTracking(false);
+                                            }
+                                        }}
+                                        onUserInteract={() => {
+                                            armEstimatedTracking(selectedEpisode);
+                                        }}
+                                        onProgress={(seconds) => recordHistory(selectedEpisode, seconds, false, false)}
+                                        onEnded={() => recordHistory(selectedEpisode, 0, true, false)}
+                                    />
+                                </div>
 
                                 {/* Unified Two-Row Cinema Control Bar */}
                                 <div className="bg-[#0d0d11] border border-white/10 rounded-2xl p-3.5 sm:p-4 space-y-3.5">
@@ -1317,6 +1413,26 @@ export default function SeriesDetail() {
                                                     )}
                                                 </button>
                                             )}
+
+                                            <button
+                                                type="button"
+                                                onClick={handleToggleStageFullscreen}
+                                                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition cursor-pointer ${
+                                                    isStageFullscreen || isPseudoFullscreen
+                                                        ? 'bg-primary/20 border-primary/50 text-primary'
+                                                        : 'bg-white/[0.04] border-white/10 text-gray-300 hover:border-primary/40 hover:text-primary'
+                                                }`}
+                                            >
+                                                {isStageFullscreen || isPseudoFullscreen ? (
+                                                    <>
+                                                        <Minimize2 className="w-3.5 h-3.5" /> Sair
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <Maximize2 className="w-3.5 h-3.5" /> Tela Cheia
+                                                    </>
+                                                )}
+                                            </button>
 
                                             <button
                                                 type="button"
@@ -2022,7 +2138,7 @@ export default function SeriesDetail() {
                                     className="w-full h-full"
                                     frameBorder="0"
                                     allowFullScreen
-                                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen; web-share"
                                 />
                             </div>
                         </motion.div>

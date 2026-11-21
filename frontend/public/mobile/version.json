@@ -1,10 +1,10 @@
 {
-  "versionCode": 9,
-  "versionName": "1.0.8",
-  "apkUrl": "https://huaplay.playdb.info/downloads/huaplay/HuaPlay-1.0.8.apk",
-  "sha256": "242d915192757e6dda86a5af390d9b2dd01d5e933667f94c37b28954cccd7273",
+  "versionCode": 10,
+  "versionName": "1.0.9",
+  "apkUrl": "https://huaplay.playdb.info/downloads/huaplay/HuaPlay-1.0.9.apk",
+  "sha256": "8128a92b2ec74036648f337ce2b336c18266ee1816743f4f30a4e1a72eadc2e9",
   "releaseNotes": [
-    "Novo layout Cinema Imersivo na tela de series e episodios (Hero limpo, Modo Cinema, lista/grade e abas de ficha, elenco e similares)",
-    "Correcao do Continuar de onde parou: Episodio 1 agora salva progresso corretamente, sem zerar tempo salvo ao retomar"
+    "Correcao de responsividade e HUD do player Google Drive no mobile (APK e PWA)",
+    "Pixeldrain em modo embed limpo (?embed) com tela cheia liberada + tela cheia nativa em paisagem no Android"
   ]
 }
