@@ -178,7 +178,7 @@ function CompactHeroCard({
                         <button
                             type="button"
                             onClick={onToggleList}
-                            className="w-full py-2.5 px-4 bg-[#262626]/85 hover:bg-[#333333] active:bg-[#404040] active:scale-[0.98] text-white font-medium text-sm rounded-md flex items-center justify-center gap-2 border border-white/10 backdrop-blur-md transition-all"
+                            className="w-full py-2.5 px-4 bg-[#262626]/90 hover:bg-[#333333] active:bg-[#404040] active:scale-[0.98] text-white font-medium text-sm rounded-md flex items-center justify-center gap-2 border border-white/10 transition-all"
                         >
                             {isInList ? (
                                 <>

@@ -31,7 +31,7 @@ export default function MobileBottomNav() {
                 className="fixed inset-x-0 bottom-0 z-50 pointer-events-none md:hidden"
             >
                 <div className="mx-auto w-full max-w-md px-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
-                    <div className="relative grid h-[68px] grid-cols-5 items-center rounded-[2rem] border border-white/15 bg-black/60 px-2 shadow-[0_18px_45px_rgba(0,0,0,0.55),inset_0_1px_0_rgba(255,255,255,0.12)] backdrop-blur-2xl pointer-events-auto supports-[not_(backdrop-filter:blur(1px))]:bg-neutral-950/95">
+                    <div className="relative grid h-[68px] grid-cols-5 items-center rounded-[2rem] border border-white/15 bg-black/80 px-2 shadow-[0_12px_32px_rgba(0,0,0,0.6),inset_0_1px_0_rgba(255,255,255,0.12)] backdrop-blur-md pointer-events-auto supports-[not_(backdrop-filter:blur(1px))]:bg-neutral-950/95">
                         {items.slice(0, 2).map(({ label, href, icon: Icon }) => {
                             const active = isActive(href);
                             return (
