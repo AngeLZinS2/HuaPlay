@@ -10,7 +10,7 @@ export default function Footer() {
                 <div className="grid grid-cols-1 gap-10 sm:grid-cols-2 lg:grid-cols-4">
                     <div>
                         <Link to="/" className="inline-flex items-center gap-3">
-                            <img src="/Logo Wei.png" alt="HuaPlay" className="h-10 w-10 rounded-full object-cover" />
+                            <img src="/logo-wei.webp" alt="HuaPlay" width={40} height={40} loading="lazy" decoding="async" className="h-10 w-10 rounded-full object-cover" />
                             <span className="font-display text-xl font-bold tracking-wider text-primary">HuaPlay</span>
                         </Link>
                         <p className="mt-4 max-w-xs text-sm leading-6 text-gray-400">Catálogo de produções asiáticas com perfis, listas e recomendações personalizadas.</p>
@@ -51,7 +51,7 @@ export default function Footer() {
                     </div>
                 </div>
 
-                <div className="mt-10 border-t border-white/10 pt-7 text-sm text-gray-500">
+                <div className="mt-10 border-t border-white/10 pt-7 text-sm text-gray-400">
                     <p className="max-w-4xl leading-6">O HuaPlay organiza informações e referências disponibilizadas por terceiros. Não hospedamos arquivos de vídeo em nossos servidores. Solicitações fundamentadas de desindexação podem ser enviadas pelo canal de contato.</p>
                     <p className="mt-4">© {new Date().getFullYear()} HuaPlay. Todos os direitos reservados.</p>
                 </div>

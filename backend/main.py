@@ -1,5 +1,6 @@
+import os
 from contextlib import asynccontextmanager
-from fastapi import Depends, FastAPI
+from fastapi import Depends, FastAPI, Response
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import inspect, text
 
@@ -60,19 +61,41 @@ async def lifespan(app: FastAPI):
     await stop_push_worker()
 
 
-app = FastAPI(title="HuaPlay Catalog API", version="0.2.0", lifespan=lifespan)
+_enable_docs = os.getenv("ENABLE_API_DOCS", "false").lower() == "true"
 
-# CORS setup
-origins = [
-    "*",
+app = FastAPI(
+    title="HuaPlay Catalog API",
+    version="0.2.0",
+    lifespan=lifespan,
+    docs_url="/docs" if _enable_docs else None,
+    redoc_url="/redoc" if _enable_docs else None,
+    openapi_url="/openapi.json" if _enable_docs else None,
+)
+
+# Restrict CORS to trusted web, PWA and Capacitor native origins (Bearer auth, no cookies)
+_default_origins = [
+    "https://huaplay.playdb.info",
+    "https://huaplay.app",
+    "capacitor://localhost",
+    "https://localhost",
+    "http://localhost",
+    "http://localhost:5173",
+    "http://localhost:4173",
+    "http://127.0.0.1:4199",
 ]
+_extra_origins = [
+    o.strip()
+    for o in os.getenv("HUAPLAY_CORS_ORIGINS", "").split(",")
+    if o.strip()
+]
+origins = list(dict.fromkeys(_default_origins + _extra_origins))
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_credentials=False,
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type", "Accept"],
     expose_headers=["X-Total-Count"],
 )
 
@@ -93,17 +116,21 @@ app.include_router(admin_suite.admin_router, dependencies=[Depends(get_current_a
 
 @app.get("/")
 def read_root():
-    return {"message": "HuaPlay Catalog API"}
+    return {"status": "ok"}
 
 
 @app.get("/auth/me")
-def read_current_user(current_user: FirebaseUser = Depends(get_current_user)):
+def read_current_user(
+    response: Response,
+    current_user: FirebaseUser = Depends(get_current_user),
+):
     """Echo back the verified identity.
 
     The client already knows who it is from the Firebase SDK; what it cannot
     know on its own is whether this backend considers it an administrator, since
     that is decided server-side.
     """
+    response.headers["Cache-Control"] = "no-store"
     return {
         "uid": current_user.uid,
         "email": current_user.email,

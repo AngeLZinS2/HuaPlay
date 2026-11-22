@@ -1,5 +1,4 @@
-import { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
+import { useState, useEffect, lazy, Suspense } from 'react';
 import { Play, Plus, Check, Volume2, VolumeX } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
@@ -9,7 +8,8 @@ import { useToast } from '../context/ToastContext';
 import { getYouTubeVideoId } from '../utils/youtube';
 import { getOptimizedImageUrl } from '../utils/image';
 import { useHeroDeviceMode, type HeroDeviceMode } from '../hooks/useHeroDeviceMode';
-import CompactHeroTrailer from './CompactHeroTrailer';
+
+const CompactHeroTrailer = lazy(() => import('./CompactHeroTrailer'));
 
 export interface FeaturedSeries {
     id: number | string;
@@ -59,9 +59,17 @@ function CompactHeroCard({
     const [isCompactMuted, setIsCompactMuted] = useState(true);
     const [compactTrailerPlaying, setCompactTrailerPlaying] = useState(false);
     const [compactTrailerFailed, setCompactTrailerFailed] = useState(false);
+    const [compactTrailerReady, setCompactTrailerReady] = useState(false);
+
+    useEffect(() => {
+        if (heroMode !== 'tablet-fold') return;
+        const timer = window.setTimeout(() => setCompactTrailerReady(true), 4000);
+        return () => window.clearTimeout(timer);
+    }, [heroMode]);
 
     const youtubeId = featured.trailer_url ? getYouTubeVideoId(featured.trailer_url) : null;
     const shouldMountCompactTrailer = Boolean(
+        compactTrailerReady &&
         heroMode === 'tablet-fold' &&
         youtubeId &&
         featured.feature_type !== 'BANNER' &&
@@ -86,33 +94,33 @@ function CompactHeroCard({
            fique perfeitamente alinhado abaixo do header de 80px (5rem).
            Compensação md:pb-16 neutraliza o md:-mt-12 aplicado pela Home nas fileiras em >= 768px. */
         <div className="w-full px-3.5 sm:px-6 pt-[calc(5rem+env(safe-area-inset-top,0px))] pb-3 md:pb-16">
-            <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.6, ease: 'easeOut' }}
+            <div
                 className={`relative w-full ${cardHeightClass} rounded-2xl overflow-hidden border border-white/15 shadow-[0_12px_40px_rgba(0,0,0,0.85)] bg-neutral-950 flex flex-col justify-end`}
             >
-                {/* Capa estática de fundo: sempre presente para evitar flash e como fallback */}
+                {/* Capa estática de fundo: sempre presente para evitar flash e LCP imediato */}
                 <img
                     src={compactImageSrc}
                     alt={featured.title}
+                    fetchPriority="high"
                     decoding="async"
                     className="absolute inset-0 w-full h-full object-cover object-top select-none pointer-events-none z-0"
                 />
 
                 {/* Trailer Inline de alta fidelidade: apenas em tablet-fold com YouTube compatível */}
                 {shouldMountCompactTrailer && youtubeId && (
-                    <CompactHeroTrailer
-                        videoId={youtubeId}
-                        title={featured.title}
-                        isMuted={isCompactMuted}
-                        onPlayingChange={(playing) => setCompactTrailerPlaying(playing)}
-                        onMuteChange={(muted) => setIsCompactMuted(muted)}
-                        onFallback={() => {
-                            setCompactTrailerFailed(true);
-                            setCompactTrailerPlaying(false);
-                        }}
-                    />
+                    <Suspense fallback={null}>
+                        <CompactHeroTrailer
+                            videoId={youtubeId}
+                            title={featured.title}
+                            isMuted={isCompactMuted}
+                            onPlayingChange={(playing) => setCompactTrailerPlaying(playing)}
+                            onMuteChange={(muted) => setIsCompactMuted(muted)}
+                            onFallback={() => {
+                                setCompactTrailerFailed(true);
+                                setCompactTrailerPlaying(false);
+                            }}
+                        />
+                    </Suspense>
                 )}
 
                 {/* Botão discreto de som: SÓ visível se o trailer compacto estiver efetivamente reproduzindo */}
@@ -157,20 +165,20 @@ function CompactHeroCard({
                     {/* Botões de Ação verticais no estilo HuaPlay */}
                     <div className="w-full max-w-md flex flex-col gap-2 sm:gap-2.5">
                         {/* Botão Primário: Assistir */}
-                        <motion.button
-                            whileTap={{ scale: 0.98 }}
+                        <button
+                            type="button"
                             onClick={onNavigate}
-                            className="w-full py-2.5 px-4 bg-white hover:bg-neutral-200 active:bg-neutral-300 text-black font-semibold text-sm rounded-md flex items-center justify-center gap-2 transition-all shadow-md"
+                            className="w-full py-2.5 px-4 bg-white hover:bg-neutral-200 active:bg-neutral-300 active:scale-[0.98] text-black font-semibold text-sm rounded-md flex items-center justify-center gap-2 transition-all shadow-md"
                         >
                             <Play className="w-4 h-4 fill-black text-black" />
                             <span>{mobilePlayLabel}</span>
-                        </motion.button>
+                        </button>
 
                         {/* Botão Secundário: Minha Lista */}
-                        <motion.button
-                            whileTap={{ scale: 0.98 }}
+                        <button
+                            type="button"
                             onClick={onToggleList}
-                            className="w-full py-2.5 px-4 bg-[#262626]/85 hover:bg-[#333333] active:bg-[#404040] text-white font-medium text-sm rounded-md flex items-center justify-center gap-2 border border-white/10 backdrop-blur-md transition-all"
+                            className="w-full py-2.5 px-4 bg-[#262626]/85 hover:bg-[#333333] active:bg-[#404040] active:scale-[0.98] text-white font-medium text-sm rounded-md flex items-center justify-center gap-2 border border-white/10 backdrop-blur-md transition-all"
                         >
                             {isInList ? (
                                 <>
@@ -183,10 +191,10 @@ function CompactHeroCard({
                                     <span>Minha lista</span>
                                 </>
                             )}
-                        </motion.button>
+                        </button>
                     </div>
                 </div>
-            </motion.div>
+            </div>
         </div>
     );
 }
@@ -199,17 +207,25 @@ export default function Hero({ initialFeatured, featuredPromise }: HeroProps = {
     const [desktopMuted, setDesktopMuted] = useState(true);
     const [desktopPlaying, setDesktopPlaying] = useState(false);
     const [desktopTrailerFailed, setDesktopTrailerFailed] = useState(false);
+    const [desktopTrailerReady, setDesktopTrailerReady] = useState(false);
 
     const navigate = useNavigate();
     const heroMode = useHeroDeviceMode();
     const { uid, currentProfile, myListIds, updateLists, isAuthenticated } = useAuth();
     const { addToast } = useToast();
 
-    // Reset de estados desktop ao mudar conteúdo ou modo
+    // Reset de estados desktop ao mudar conteúdo ou modo + defer do iframe YouTube após LCP
     useEffect(() => {
         setDesktopMuted(true);
         setDesktopPlaying(false);
         setDesktopTrailerFailed(false);
+        setDesktopTrailerReady(false);
+
+        if (heroMode !== 'desktop') return;
+        const timer = window.setTimeout(() => {
+            setDesktopTrailerReady(true);
+        }, 4200);
+        return () => window.clearTimeout(timer);
     }, [featured?.id, featured?.trailer_url, heroMode]);
 
     const isInList = featured ? myListIds.includes(Number(featured.id)) : false;
@@ -306,7 +322,17 @@ export default function Hero({ initialFeatured, featuredPromise }: HeroProps = {
     }, [initialFeatured, featuredPromise]);
 
     if (loading) {
-        return <div className="relative h-screen w-full bg-black" />;
+        if (heroMode === 'desktop') {
+            return <div className="relative h-screen w-full bg-black" />;
+        }
+        const skeletonHeightClass = heroMode === 'tablet-fold'
+            ? 'h-[72vh] min-h-[220px] md:min-h-[460px] max-h-[calc(100svh-196px-env(safe-area-inset-top,0px)-max(16px,env(safe-area-inset-bottom,0px)))] md:max-h-[620px]'
+            : 'h-[74vh] min-h-[220px] md:min-h-[300px] max-h-[calc(100svh-196px-env(safe-area-inset-top,0px)-max(16px,env(safe-area-inset-bottom,0px)))] md:max-h-[580px]';
+        return (
+            <div className="w-full px-3.5 sm:px-6 pt-[calc(5rem+env(safe-area-inset-top,0px))] pb-3 md:pb-16">
+                <div className={`relative w-full ${skeletonHeightClass} rounded-2xl border border-white/10 bg-neutral-950 animate-pulse`} />
+            </div>
+        );
     }
 
     if (!featured) {
@@ -314,24 +340,20 @@ export default function Hero({ initialFeatured, featuredPromise }: HeroProps = {
             <div className="relative h-screen w-full overflow-hidden bg-black">
                 <div className="absolute inset-0 select-none pointer-events-none">
                     <img
-                        src="/Banner Wei.png"
+                        src="/banner-wei.webp"
                         alt="HuaPlay"
+                        fetchPriority="high"
                         className="w-full h-full object-cover"
                     />
                     <div className="absolute inset-0 bg-black/40" />
                     <div className="absolute inset-0 bg-gradient-to-t from-[#141414] via-transparent to-transparent" />
                 </div>
                 <div className="relative h-full w-full px-4 flex flex-col items-center justify-end pb-40">
-                    <motion.div
-                        initial={{ opacity: 0, y: 50 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ duration: 0.8 }}
-                        className="text-center"
-                    >
+                    <div className="text-center">
                         <p className="text-xl md:text-2xl text-gray-200 font-light tracking-widest uppercase drop-shadow-lg bg-black/30 backdrop-blur-sm py-2 px-6 rounded-full border border-white/10">
                             O melhor do entretenimento asiático para você
                         </p>
-                    </motion.div>
+                    </div>
                 </div>
             </div>
         );
@@ -360,6 +382,7 @@ export default function Hero({ initialFeatured, featuredPromise }: HeroProps = {
     if (heroMode === 'desktop') {
         const desktopYoutubeId = featured.trailer_url ? getYouTubeVideoId(featured.trailer_url) : null;
         const shouldMountDesktopTrailer = Boolean(
+            desktopTrailerReady &&
             desktopYoutubeId &&
             featured.feature_type !== 'BANNER' &&
             !desktopTrailerFailed
@@ -367,28 +390,31 @@ export default function Hero({ initialFeatured, featuredPromise }: HeroProps = {
 
         return (
             <div className="relative h-screen w-full overflow-hidden">
-                {/* Background Video/Image: banner img SEMPRE como base */}
+                {/* Background Video/Image: banner img SEMPRE como base com prioridade LCP */}
                 <div className="absolute inset-0 select-none pointer-events-none">
                     <img
                         src={getOptimizedImageUrl(featured.banner_image || featured.cover_image, 'backdrop')}
                         alt={featured.title}
+                        fetchPriority="high"
                         decoding="async"
                         className="w-full h-full object-cover"
                     />
 
                     {shouldMountDesktopTrailer && desktopYoutubeId && (
-                        <CompactHeroTrailer
-                            key={`${featured.id}-${featured.trailer_url}`}
-                            videoId={desktopYoutubeId}
-                            title={featured.title}
-                            isMuted={desktopMuted}
-                            onPlayingChange={(playing) => setDesktopPlaying(playing)}
-                            onMuteChange={(muted) => setDesktopMuted(muted)}
-                            onFallback={() => {
-                                setDesktopTrailerFailed(true);
-                                setDesktopPlaying(false);
-                            }}
-                        />
+                        <Suspense fallback={null}>
+                            <CompactHeroTrailer
+                                key={`${featured.id}-${featured.trailer_url}`}
+                                videoId={desktopYoutubeId}
+                                title={featured.title}
+                                isMuted={desktopMuted}
+                                onPlayingChange={(playing) => setDesktopPlaying(playing)}
+                                onMuteChange={(muted) => setDesktopMuted(muted)}
+                                onFallback={() => {
+                                    setDesktopTrailerFailed(true);
+                                    setDesktopPlaying(false);
+                                }}
+                            />
+                        </Suspense>
                     )}
 
                     {/* Cinematic Gradient Overlays */}
@@ -400,23 +426,13 @@ export default function Hero({ initialFeatured, featuredPromise }: HeroProps = {
 
                 {/* Content */}
                 <div className="relative h-full w-full px-6 md:px-12 lg:px-20 flex items-center pt-16 md:pt-20 lg:pt-24 pb-12">
-                    <motion.div
-                        initial={{ opacity: 0, y: 50 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ duration: 0.8, delay: 0.2 }}
-                        className="max-w-4xl space-y-4 md:space-y-6 lg:space-y-8"
-                    >
-                        <motion.div
-                            initial={{ opacity: 0, x: -20 }}
-                            animate={{ opacity: 1, x: 0 }}
-                            transition={{ delay: 0.5 }}
-                            className="flex items-center gap-3 mb-4"
-                        >
+                    <div className="max-w-4xl space-y-4 md:space-y-6 lg:space-y-8">
+                        <div className="flex items-center gap-3 mb-4">
                             <div className="h-[2px] w-8 md:w-12 bg-primary"></div>
                             <span className="text-primary font-display font-bold tracking-[0.2em] text-xs md:text-sm uppercase glow-text">
                                 Destaque Semanal
                             </span>
-                        </motion.div>
+                        </div>
 
                         <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl xl:text-7xl font-display font-bold leading-none text-transparent bg-clip-text bg-gradient-to-b from-white to-gray-400 drop-shadow-2xl max-w-4xl">
                             {featured.title}
@@ -434,27 +450,25 @@ export default function Hero({ initialFeatured, featuredPromise }: HeroProps = {
                         </p>
 
                         <div className="flex flex-wrap items-center gap-4 pt-4 md:pt-6">
-                            <motion.button
-                                whileHover={{ scale: 1.05, textShadow: "0 0 8px rgba(212, 175, 55, 0.5)" }}
-                                whileTap={{ scale: 0.95 }}
+                            <button
+                                type="button"
                                 onClick={() => navigate(`/series/${featured.slug || featured.id}`)}
-                                className="group flex items-center gap-2 md:gap-3 px-6 py-3 md:px-10 md:py-4 bg-gradient-to-r from-primary to-[#b8860b] text-black rounded-sm font-display font-bold text-base md:text-xl hover:brightness-110 transition-all shadow-[0_0_20px_rgba(212,175,55,0.3)] w-full md:w-auto justify-center"
+                                className="group flex items-center gap-2 md:gap-3 px-6 py-3 md:px-10 md:py-4 bg-gradient-to-r from-primary to-[#b8860b] text-black rounded-sm font-display font-bold text-base md:text-xl hover:brightness-110 hover:scale-105 active:scale-95 transition-all shadow-[0_0_20px_rgba(212,175,55,0.3)] w-full md:w-auto justify-center"
                             >
                                 <Play className="w-5 h-5 md:w-6 md:h-6 fill-black group-hover:fill-current transition-colors" />
                                 ASSISTIR AGORA
-                            </motion.button>
+                            </button>
 
-                            <motion.button
-                                whileHover={{ scale: 1.05, borderColor: "#D4AF37", color: "#D4AF37" }}
-                                whileTap={{ scale: 0.95 }}
+                            <button
+                                type="button"
                                 onClick={handleToggleList}
-                                className={`flex items-center gap-2 md:gap-3 px-6 py-3 md:px-8 md:py-4 border border-white/30 backdrop-blur-md rounded-sm font-display font-bold text-base md:text-xl transition-all hover:bg-black/60 w-full md:w-auto justify-center ${isInList ? 'bg-primary/20 text-primary border-primary' : 'bg-black/40 text-white'}`}
+                                className={`flex items-center gap-2 md:gap-3 px-6 py-3 md:px-8 md:py-4 border border-white/30 backdrop-blur-md rounded-sm font-display font-bold text-base md:text-xl transition-all hover:bg-black/60 hover:border-primary hover:text-primary hover:scale-105 active:scale-95 w-full md:w-auto justify-center ${isInList ? 'bg-primary/20 text-primary border-primary' : 'bg-black/40 text-white'}`}
                             >
                                 {isInList ? <Check className="w-5 h-5 md:w-6 md:h-6" /> : <Plus className="w-5 h-5 md:w-6 md:h-6" />}
                                 {isInList ? 'NA LISTA' : 'MINHA LISTA'}
-                            </motion.button>
+                            </button>
                         </div>
-                    </motion.div>
+                    </div>
                 </div>
 
                 {/* Mute toggle for Desktop Trailer: somente quando reproduzindo */}

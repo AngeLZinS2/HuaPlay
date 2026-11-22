@@ -21,8 +21,8 @@ export const getOptimizedImageUrl = (
         // Extract relative path e.g. /t/p/w500/abc.jpg -> /t/p/w342/abc.jpg
         const tmdbPath = cleanUrl.replace(/^https?:\/\/image\.tmdb\.org\/t\/p\/[^\/]+\//, `/t/p/${size}/`);
         
-        // Proxy through Jetpack Global Edge CDN (i0.wp.com) - 200 OK fast response in LatAm/Brazil
-        return `https://i0.wp.com/image.tmdb.org${tmdbPath}`;
+        // Proxy through Jetpack Global Edge CDN (i0.wp.com) with automatic WebP + quality compression
+        return `https://i0.wp.com/image.tmdb.org${tmdbPath}?quality=75&strip=all`;
     }
 
     return cleanUrl;

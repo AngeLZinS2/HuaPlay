@@ -1,7 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { Bell, Check, ExternalLink, Loader2, Volume2, VolumeX, ShieldAlert, X } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { useNotifications } from '../context/NotificationContext';
 import { useAuth } from '../context/AuthContext';
@@ -283,66 +282,55 @@ export default function NotificationBell({ className = '' }: { className?: strin
         ref={bellButtonRef}
         type="button"
         onClick={() => setIsOpen((prev) => !prev)}
-        aria-label={`Notificações ${unreadCount > 0 ? `(${unreadCount} novas)` : ''}`}
+        aria-label={`Notificações${unreadCount > 0 ? ` (${unreadCount} novas)` : ''}`}
         aria-expanded={isOpen}
         aria-haspopup="dialog"
         className="relative flex items-center justify-center p-2 rounded-full text-gray-300 hover:text-white transition-colors focus:outline-none focus:ring-1 focus:ring-primary/40 active:scale-95"
       >
         <Bell className="w-5 h-5" />
-        {unreadCount > 0 && (
-          <span className="absolute top-1 right-1 flex h-4 min-w-4 px-1 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-black shadow-md">
-            {unreadCount > 9 ? '9+' : unreadCount}
-          </span>
-        )}
       </button>
+      {unreadCount > 0 && (
+        <span
+          aria-hidden="true"
+          className="pointer-events-none absolute top-1 right-1 flex h-4 min-w-4 px-1 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-black shadow-md"
+        >
+          {unreadCount > 9 ? '9+' : unreadCount}
+        </span>
+      )}
 
       {/* Desktop Dropdown */}
-      <AnimatePresence>
-        {isOpen && !isMobile && (
-          <motion.div
+      {isOpen && !isMobile && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="Painel de Notificações"
+          className="absolute right-0 top-full mt-2 w-96 max-w-[calc(100vw-1.5rem)] rounded-2xl border border-white/10 bg-[#121212] p-0 shadow-2xl z-50 overflow-hidden flex flex-col max-h-[min(80vh,560px)] animate-[fadeIn_0.16s_ease-out]"
+        >
+          {renderPanelContent(false)}
+        </div>
+      )}
+
+      {/* Mobile Bottom Sheet rendered via Portal to avoid transformed ancestor clipping */}
+      {typeof document !== 'undefined' && isOpen && isMobile && createPortal(
+        <div className="fixed inset-0 z-[100] sm:hidden" role="presentation">
+          <button
+            type="button"
+            aria-label="Fechar painel"
+            onClick={closePanel}
+            className="absolute inset-0 bg-black/65 transition-opacity"
+          />
+          <div
+            ref={sheetRef}
             role="dialog"
             aria-modal="true"
             aria-label="Painel de Notificações"
-            initial={{ opacity: 0, y: 8, scale: 0.96 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 8, scale: 0.96 }}
-            transition={{ duration: 0.18, ease: 'easeOut' }}
-            className="absolute right-0 top-full mt-2 w-96 max-w-[calc(100vw-1.5rem)] rounded-2xl border border-white/10 bg-[#121212] p-0 shadow-2xl z-50 overflow-hidden flex flex-col max-h-[min(80vh,560px)]"
+            tabIndex={-1}
+            className="fixed inset-x-0 bottom-0 z-[101] max-h-[82dvh] flex flex-col rounded-t-[1.75rem] border-t border-amber-500/25 bg-[#0e0e0e] shadow-[0_-16px_50px_rgba(0,0,0,0.95)] pb-[max(1.25rem,env(safe-area-inset-bottom))] overflow-hidden animate-[slideUp_0.22s_ease-out]"
           >
-            {renderPanelContent(false)}
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Mobile Bottom Sheet rendered via Portal to avoid transformed ancestor clipping */}
-      {typeof document !== 'undefined' && createPortal(
-        <AnimatePresence>
-          {isOpen && isMobile && (
-            <div className="fixed inset-0 z-[100] sm:hidden" role="presentation">
-              <button
-                type="button"
-                aria-label="Fechar painel"
-                onClick={closePanel}
-                className="absolute inset-0 bg-black/65 transition-opacity"
-              />
-              <motion.div
-                ref={sheetRef}
-                role="dialog"
-                aria-modal="true"
-                aria-label="Painel de Notificações"
-                tabIndex={-1}
-                initial={{ y: '100%' }}
-                animate={{ y: 0 }}
-                exit={{ y: '100%' }}
-                transition={{ type: 'spring', damping: 30, stiffness: 320 }}
-                className="fixed inset-x-0 bottom-0 z-[101] max-h-[82dvh] flex flex-col rounded-t-[1.75rem] border-t border-amber-500/25 bg-[#0e0e0e] shadow-[0_-16px_50px_rgba(0,0,0,0.95)] pb-[max(1.25rem,env(safe-area-inset-bottom))] overflow-hidden"
-              >
-                <div className="mx-auto mt-3 mb-1.5 h-1.5 w-12 rounded-full bg-white/20 shrink-0" />
-                {renderPanelContent(true)}
-              </motion.div>
-            </div>
-          )}
-        </AnimatePresence>,
+            <div className="mx-auto mt-3 mb-1.5 h-1.5 w-12 rounded-full bg-white/20 shrink-0" />
+            {renderPanelContent(true)}
+          </div>
+        </div>,
         document.body
       )}
     </div>

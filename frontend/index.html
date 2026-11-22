@@ -5,6 +5,23 @@
   <meta charset="UTF-8" />
   <link rel="icon" type="image/png" href="/sakura.png" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="description" content="HuaPlay — Assista dramas asiáticos, doramas, filmes e donghuas legendados em alta definição com perfis, listas e recomendações personalizadas." />
+  <meta name="theme-color" content="#050505" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="preconnect" href="https://i0.wp.com" crossorigin />
+  <link
+    rel="stylesheet"
+    href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Inter:wght@300;400;600&display=swap"
+    media="print"
+    onload="this.media='all'"
+  />
+  <noscript>
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Inter:wght@300;400;600&display=swap"
+    />
+  </noscript>
   <script>
     // Some Android browsers keep a desktop-sized virtual viewport even on a
     // phone. Detect handheld touch hardware before the app and CSS load, then
@@ -12,18 +29,49 @@
     (function () {
       var shortestSide = Math.min(screen.width || 9999, screen.height || 9999);
       var isHandheld = navigator.maxTouchPoints > 0 && shortestSide <= 1024;
-      if (!isHandheld) return;
+      if (isHandheld) {
+        var viewport = document.querySelector('meta[name="viewport"]');
+        var mobileWidth = Math.min(shortestSide, 480);
+        viewport.setAttribute('content', 'width=' + mobileWidth + ', initial-scale=1.0, viewport-fit=cover');
+        document.documentElement.classList.add('mobile-device');
+      }
 
-      var viewport = document.querySelector('meta[name="viewport"]');
-      var mobileWidth = Math.min(shortestSide, 480);
-      viewport.setAttribute('content', 'width=' + mobileWidth + ', initial-scale=1.0, viewport-fit=cover');
-      document.documentElement.classList.add('mobile-device');
+      // Kick off hero-featured fetch + LCP image preload on Home immediately
+      // while the JS bundle is still downloading (eliminates API->IMG waterfall).
+      if (window.location.pathname === '/' && window.location.protocol.indexOf('http') === 0 && window.location.hostname !== 'localhost') {
+        var isDesktopViewport = window.innerWidth >= 1024;
+        window.__HUAPLAY_HERO_PROMISE = fetch('/api/series/hero-featured', { credentials: 'omit' })
+          .then(function (res) { return res.ok ? res.json() : null; })
+          .then(function (data) {
+            if (!data) return null;
+            var rawImg = isDesktopViewport
+              ? (data.banner_image || data.cover_image)
+              : (data.cover_image || data.banner_image);
+            if (rawImg && typeof rawImg === 'string') {
+              var clean = rawImg.trim();
+              var imgUrl = clean;
+              if (clean.indexOf('image.tmdb.org') !== -1) {
+                var size = isDesktopViewport ? 'w1280' : 'w342';
+                var tmdbPath = clean.replace(/^https?:\/\/image\.tmdb\.org\/t\/p\/[^/]+\//, '/t/p/' + size + '/');
+                imgUrl = 'https://i0.wp.com/image.tmdb.org' + tmdbPath + '?quality=75&strip=all';
+              }
+              var link = document.createElement('link');
+              link.rel = 'preload';
+              link.as = 'image';
+              link.href = imgUrl;
+              link.setAttribute('fetchpriority', 'high');
+              document.head.appendChild(link);
+            }
+            return data;
+          })
+          .catch(function () { return null; });
+      }
     })();
   </script>
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <title>HuaPlay</title>
+  <title>HuaPlay — Dramas Asiáticos, Filmes e Donghuas</title>
 </head>
 
 <body>

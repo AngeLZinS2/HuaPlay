@@ -1,34 +1,53 @@
 import { Routes, Route, useLocation, useNavigate } from 'react-router-dom';
-import { AnimatePresence } from 'framer-motion';
-import { ModalProvider } from './context/ModalContext';
+import { ModalProvider, useModal } from './context/ModalContext';
 import { NotificationProvider } from './context/NotificationContext';
 import { useAuth } from './context/AuthContext';
 import { lazy, Suspense, use, useEffect, useState, type ComponentType, type ReactNode } from 'react';
 import { Capacitor } from '@capacitor/core';
-import SeriesDetailsModal from './components/SeriesDetailsModal';
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
 import Home from './pages/Home';
 import PageTransition from './components/PageTransition';
-import AdminLayout from './components/admin/AdminLayout';
-import RequireAdmin from './components/admin/RequireAdmin';
 import MobileBottomNav from './components/MobileBottomNav';
-import ShakeToReport from './components/ShakeToReport';
+
+const AdminLayout = lazy(() => import('./components/admin/AdminLayout'));
+const RequireAdmin = lazy(() => import('./components/admin/RequireAdmin'));
+const SeriesDetailsModal = lazy(() => import('./components/SeriesDetailsModal'));
+const ShakeToReport = lazy(() => import('./components/ShakeToReport'));
+
+function LazySeriesDetailsModal() {
+  const { isOpen } = useModal();
+  if (!isOpen) return null;
+  return (
+    <Suspense fallback={null}>
+      <SeriesDetailsModal />
+    </Suspense>
+  );
+}
+
+function DeferredShakeToReport() {
+  const [ready, setReady] = useState(false);
+  useEffect(() => {
+    const onOpen = () => setReady(true);
+    window.addEventListener('huaplay:open-report', onOpen, { once: true });
+    const timer = window.setTimeout(() => setReady(true), 4000);
+    return () => {
+      window.removeEventListener('huaplay:open-report', onOpen);
+      window.clearTimeout(timer);
+    };
+  }, []);
+  if (!ready) return null;
+  return (
+    <Suspense fallback={null}>
+      <ShakeToReport />
+    </Suspense>
+  );
+}
 
 const isNativeAndroid = import.meta.env.MODE === 'mobile' && Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android';
 const NativeAppUpdater = isNativeAndroid
   ? lazy(() => import('./components/NativeAppUpdater'))
   : null;
-
-const isTouchOrCoarse = () => {
-  if (typeof window === 'undefined') return false;
-  return (
-    isNativeAndroid ||
-    window.matchMedia?.('(pointer: coarse)').matches ||
-    window.innerWidth < 768 ||
-    'ontouchstart' in window
-  );
-};
 
 function lazyPage<T extends ComponentType>(loader: () => Promise<{ default: T }>) {
   let pending: ReturnType<typeof loader> | undefined;
@@ -165,8 +184,8 @@ function PublicLayout({ children }: { children: React.ReactNode }) {
           <main className="flex-grow">{children}</main>
           <Footer />
           <MobileBottomNav />
-          <ShakeToReport />
-          <SeriesDetailsModal />
+          <DeferredShakeToReport />
+          <LazySeriesDetailsModal />
         </div>
       </NotificationProvider>
     </ModalProvider>
@@ -177,13 +196,6 @@ function App() {
   const location = useLocation();
   const navigate = useNavigate();
   const { isAuthenticated, currentProfile, isLoading } = useAuth();
-  const [isMobileDevice, setIsMobileDevice] = useState(isTouchOrCoarse);
-
-  useEffect(() => {
-    const update = () => setIsMobileDevice(isTouchOrCoarse());
-    window.addEventListener('resize', update, { passive: true });
-    return () => window.removeEventListener('resize', update);
-  }, []);
 
   const isAdminRoute = location.pathname.startsWith('/admin');
 
@@ -204,31 +216,35 @@ function App() {
       loadProfile().catch(() => {});
     };
 
-    if ('requestIdleCallback' in window) {
-      const handle = (window as unknown as { requestIdleCallback: (cb: () => void, opts: { timeout: number }) => number }).requestIdleCallback(
-        prefetchCommon,
-        { timeout: 3000 }
-      );
-      return () => {
-        if ('cancelIdleCallback' in window) {
-          (window as unknown as { cancelIdleCallback: (id: number) => void }).cancelIdleCallback(handle);
-        }
-      };
-    } else {
-      const timer = setTimeout(prefetchCommon, 1500);
-      return () => clearTimeout(timer);
-    }
+    let idleHandle: number | null = null;
+    const timer = window.setTimeout(() => {
+      if ('requestIdleCallback' in window) {
+        idleHandle = (window as unknown as { requestIdleCallback: (cb: () => void, opts: { timeout: number }) => number }).requestIdleCallback(
+          prefetchCommon,
+          { timeout: 3000 }
+        );
+      } else {
+        prefetchCommon();
+      }
+    }, 5500);
+
+    return () => {
+      window.clearTimeout(timer);
+      if (idleHandle !== null && 'cancelIdleCallback' in window) {
+        (window as unknown as { cancelIdleCallback: (id: number) => void }).cancelIdleCallback(idleHandle);
+      }
+    };
   }, []);
 
   // ─── Admin Layout (isolated) ───────────────────────────────────────────────
   if (isAdminRoute) {
     return (
       <>
-        <RequireAdmin>
-          <AdminLayout>
-            <Suspense fallback={<PageLoading />}>
+        <Suspense fallback={<PageLoading />}>
+          <RequireAdmin>
+            <AdminLayout>
+              <Suspense fallback={<PageLoading />}>
               <AdminRouteReady pathname={location.pathname}>
-                <AnimatePresence mode="wait">
                   <Routes location={location} key={location.pathname}>
                     <Route path="/admin" element={<AdminDashboard />} />
                     <Route path="/admin/series" element={<AdminSeries />} />
@@ -247,11 +263,11 @@ function App() {
                     <Route path="/admin/maintenance" element={<AdminMaintenance />} />
                     <Route path="/admin/home-preview" element={<AdminHomePreview />} />
                   </Routes>
-                </AnimatePresence>
               </AdminRouteReady>
-            </Suspense>
-          </AdminLayout>
-        </RequireAdmin>
+              </Suspense>
+            </AdminLayout>
+          </RequireAdmin>
+        </Suspense>
         {NativeAppUpdater && (
           <Suspense fallback={null}>
             <NativeAppUpdater />
@@ -292,13 +308,7 @@ function App() {
       <PublicLayout>
         <Suspense fallback={<PageLoading />}>
           <PublicRouteReady pathname={location.pathname}>
-            {isMobileDevice ? (
-              publicRoutes
-            ) : (
-              <AnimatePresence mode="wait">
-                {publicRoutes}
-              </AnimatePresence>
-            )}
+            {publicRoutes}
           </PublicRouteReady>
         </Suspense>
       </PublicLayout>

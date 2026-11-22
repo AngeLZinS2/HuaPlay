@@ -24,6 +24,7 @@ export interface YTStateChangeEvent {
 }
 
 export interface YTPlayerOptions {
+    host?: string;
     videoId: string;
     width?: string | number;
     height?: string | number;

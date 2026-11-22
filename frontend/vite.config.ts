@@ -11,7 +11,8 @@ export default defineConfig(({ mode }) => ({
       : [
           VitePWA({
             registerType: 'autoUpdate',
-            includeAssets: ['sakura.png', 'Logo Wei.png'],
+            injectRegister: 'script-defer',
+            includeAssets: ['sakura.png', 'logo-wei.webp'],
             manifest: {
               name: 'HuaPlay',
               short_name: 'HuaPlay',
@@ -40,6 +41,27 @@ export default defineConfig(({ mode }) => ({
           })
         ])
   ],
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (!id.includes('node_modules')) return
+          if (id.includes('firebase/firestore') || id.includes('@firebase/firestore')) {
+            return 'firebase-firestore'
+          }
+          if (id.includes('firebase/') || id.includes('@firebase/')) {
+            return 'firebase-auth'
+          }
+          if (id.includes('framer-motion')) {
+            return 'framer-motion'
+          }
+          if (id.includes('react-router') || id.includes('react-dom') || id.includes('/react/')) {
+            return 'react-vendor'
+          }
+        }
+      }
+    }
+  },
   server: {
     host: true
   }

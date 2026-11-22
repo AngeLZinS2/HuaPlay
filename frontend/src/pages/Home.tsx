@@ -11,6 +11,7 @@ import {
     getCachedPublicCatalog,
     fetchPublicCatalogWithDedup,
     formatSeriesList,
+    getHeroFeaturedEarly,
 } from '../services/catalogCache';
 
 export default function Home() {
@@ -31,7 +32,9 @@ export default function Home() {
     const [trending, setTrending] = useState(initialCached?.data.trending ?? []);
     const [newReleases, setNewReleases] = useState(initialCached?.data.newReleases ?? []);
     const [wuxiaRow, setWuxiaRow] = useState(initialCached?.data.wuxiaRow ?? []);
-    const heroPromiseRef = useRef<Promise<any> | null>(null);
+    const heroPromiseRef = useRef<Promise<any> | null>(
+        initialCached?.data.heroFeatured ? null : getHeroFeaturedEarly()
+    );
     const { openModal } = useModal();
 
     useHomeInactivityRedirect(isAuthenticated && Boolean(currentProfile));
@@ -47,12 +50,22 @@ export default function Home() {
         if (shouldFetch) {
             if (!currentCached) {
                 setLoading(true);
+                // Resolve Hero ASAP without blocking on the larger /home/sections payload
+                const earlyHero = getHeroFeaturedEarly(controller.signal);
+                heroPromiseRef.current = earlyHero;
+                earlyHero.then((hero) => {
+                    if (!isCancelled && hero) {
+                        setHeroFeatured(hero);
+                    }
+                }).catch(() => {});
             }
 
             const fetchPromise = fetchPublicCatalogWithDedup(controller.signal);
-            heroPromiseRef.current = fetchPromise
-                .then((c) => c.heroFeatured)
-                .catch(() => null);
+            if (!heroPromiseRef.current) {
+                heroPromiseRef.current = fetchPromise
+                    .then((c) => c.heroFeatured)
+                    .catch(() => null);
+            }
 
             fetchPromise
                 .then((catalog) => {
@@ -135,10 +148,15 @@ export default function Home() {
             }
         };
 
-        fetchRecommendations();
+        const recTimer = window.setTimeout(() => {
+            if (!isCancelled) {
+                void fetchRecommendations();
+            }
+        }, 1200);
 
         return () => {
             isCancelled = true;
+            window.clearTimeout(recTimer);
             controller.abort();
         };
     }, [uid, currentProfile?.id, myLikeIds, myListIds]);
@@ -175,25 +193,42 @@ export default function Home() {
         openModal(seriesItem);
     }, [openModal]);
 
-    if (loading) {
-        return (
-            <div className="min-h-screen flex items-center justify-center text-white bg-background">
-                <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
-            </div>
-        );
-    }
+    const hasAnyRows =
+        (isAuthenticated && myListRow.length > 0) ||
+        recommended.length > 0 ||
+        Boolean(becauseYouWatched && becauseYouWatched.list.length > 0) ||
+        managedRows.some((row) => row.items.length > 0) ||
+        (!hasManagedHome && (trending.length > 0 || newReleases.length > 0 || wuxiaRow.length > 0));
 
     return (
-        <div className="min-h-screen pb-2 md:pb-20 overflow-x-hidden">
+        <div className="min-h-screen pb-2 md:pb-20 overflow-x-clip">
             <Hero initialFeatured={heroFeatured} featuredPromise={heroPromiseRef.current} />
 
             <div className="relative z-10 mt-2 md:-mt-12 space-y-8 md:space-y-12">
+                {loading && !hasAnyRows && (
+                    <div className="space-y-8 px-4 sm:px-6 lg:px-8 pt-4" aria-busy="true" aria-label="Carregando catálogo">
+                        {[0, 1].map((rowIdx) => (
+                            <div key={rowIdx} className="space-y-3">
+                                <div className="h-6 w-48 rounded bg-white/10 animate-pulse" />
+                                <div className="flex gap-3 overflow-hidden">
+                                    {[0, 1, 2, 3, 4, 5].map((cardIdx) => (
+                                        <div
+                                            key={cardIdx}
+                                            className="flex-none w-[140px] md:w-[200px] h-[210px] md:h-[300px] rounded-md bg-white/[0.06] animate-pulse"
+                                        />
+                                    ))}
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
                 {/* 0. Minha Lista (Exibido apenas se o usuário estiver logado e possuir conteúdos salvos) */}
                 {isAuthenticated && myListRow.length > 0 && (
                     <SeriesRow
                         title="Minha Lista"
                         series={myListRow}
                         onOpenModal={handleOpenModal}
+                        eager
                     />
                 )}
 
@@ -203,6 +238,7 @@ export default function Home() {
                         title={isPersonalized ? "Recomendados para Você" : "Recomendações em Destaque"}
                         series={recommended}
                         onOpenModal={handleOpenModal}
+                        eager
                     />
                 )}
 
@@ -216,12 +252,13 @@ export default function Home() {
                 )}
 
                 {/* Fileiras editoriais configuradas no Painel Admin */}
-                {managedRows.map((row) => row.items.length > 0 && (
+                {managedRows.map((row, idx) => row.items.length > 0 && (
                     <SeriesRow
                         key={row.id}
                         title={row.title}
                         series={row.items}
                         onOpenModal={handleOpenModal}
+                        eager={idx < 2}
                     />
                 ))}
 
@@ -231,6 +268,7 @@ export default function Home() {
                         title="Em Alta no HuaPlay"
                         series={trending}
                         onOpenModal={handleOpenModal}
+                        eager
                     />
                 )}
 

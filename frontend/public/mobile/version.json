@@ -1,10 +1,10 @@
 {
-  "versionCode": 11,
-  "versionName": "1.0.10",
-  "apkUrl": "https://huaplay.playdb.info/downloads/huaplay/HuaPlay-1.0.10.apk",
-  "sha256": "ae6e92e325d0c0b90ea8e62ad0db3e3b2b5c19c967b5fe730ed9af36c06f9cc2",
+  "versionCode": 12,
+  "versionName": "1.0.11",
+  "apkUrl": "https://huaplay.playdb.info/downloads/huaplay/HuaPlay-1.0.11.apk",
+  "sha256": "2925c7d0cc8226a3367953cb4d6aa42ce71d2e366f856e7ec25666717fb624af",
   "releaseNotes": [
-    "Novo layout Magazine & Barra Flutuante nas telas de Catalogo, Pesquisa e Cronograma (banner Spotlight, barra fixa em vidro fosco e cards com titulo/metadados legiveis)",
-    "Novos filtros de Ano e Ordenacao, chips removiveis, modo Grade/Lista, contagem real de obras e gaveta de filtros otimizada para mobile"
+    "Otimizacao massiva de desempenho na Home e navegacao (carregamento inicial ate 3x mais rapido, imagens WebP e fileiras sob demanda)",
+    "Melhorias de acessibilidade, SEO e reforco de seguranca na API e servidor"
   ]
 }

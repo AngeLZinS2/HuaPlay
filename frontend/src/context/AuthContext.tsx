@@ -1,18 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
-import {
-    GoogleAuthProvider,
-    createUserWithEmailAndPassword,
-    onAuthStateChanged,
-    signInWithCredential,
-    signInWithEmailAndPassword,
-    signInWithPopup,
-    signOut,
-    updateProfile as updateAuthProfile,
-    type User,
-} from 'firebase/auth';
+import type { Auth, User } from 'firebase/auth';
 import { Capacitor } from '@capacitor/core';
-import { auth, googleProvider } from '../services/firebase';
-import { getBackendIdentity } from '../services/api';
+import { getBackendIdentity, registerAuthTokenProvider } from '../services/api';
 import {
     ensureUserDoc,
     listLikes,
@@ -50,19 +39,61 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 const PROFILE_KEY = 'current_profile_id';
+const HAS_AUTH_KEY = 'huaplay_has_auth';
+
+function shouldBootAuthImmediately(): boolean {
+    if (typeof window === 'undefined') return true;
+    try {
+        if (localStorage.getItem(HAS_AUTH_KEY) === '1' || localStorage.getItem(PROFILE_KEY)) {
+            return true;
+        }
+    } catch {
+        // Ignore storage errors
+    }
+    const p = window.location.pathname;
+    return (
+        p.startsWith('/admin') ||
+        p.startsWith('/login') ||
+        p.startsWith('/profile') ||
+        p.startsWith('/my-list') ||
+        p.startsWith('/series/')
+    );
+}
+
+let firebaseModulesPromise: Promise<{
+    auth: Auth;
+    googleProvider: import('firebase/auth').GoogleAuthProvider;
+    fbAuth: typeof import('firebase/auth');
+}> | null = null;
+
+function loadFirebaseAuth() {
+    if (!firebaseModulesPromise) {
+        firebaseModulesPromise = Promise.all([
+            import('../services/firebase'),
+            import('firebase/auth'),
+        ]).then(([fb, fbAuth]) => {
+            registerAuthTokenProvider(async () => {
+                const u = fb.auth.currentUser;
+                return u ? u.getIdToken() : null;
+            });
+            return { auth: fb.auth, googleProvider: fb.googleProvider, fbAuth };
+        });
+    }
+    return firebaseModulesPromise;
+}
 
 export function AuthProvider({ children }: { children: ReactNode }) {
     const [user, setUser] = useState<User | null>(null);
     const [isAdmin, setIsAdmin] = useState(false);
     const [profiles, setProfiles] = useState<UserProfile[]>([]);
     const [currentProfile, setCurrentProfile] = useState<UserProfile | null>(null);
-    const [isLoading, setIsLoading] = useState(true);
+    const [isLoading, setIsLoading] = useState<boolean>(shouldBootAuthImmediately);
     const [myListIds, setMyListIds] = useState<number[]>([]);
     const [myLikeIds, setMyLikeIds] = useState<number[]>([]);
 
     const uid = user?.uid ?? null;
 
-    // Sequence counters to prevent race conditions on account switch and out-of-order responses
+    const authInstanceRef = useRef<Auth | null>(null);
     const authSeqRef = useRef(0);
     const profileSeqRef = useRef(0);
     const listSeqRef = useRef(0);
@@ -82,8 +113,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 listMyList(targetUid, targetProfileId),
                 listLikes(targetUid, targetProfileId),
             ]);
-            // Discard stale responses if user or profile changed while fetching
-            if (listSeqRef.current === currentSeq && auth.currentUser?.uid === targetUid) {
+            if (listSeqRef.current === currentSeq && authInstanceRef.current?.currentUser?.uid === targetUid) {
                 setMyListIds(list);
                 setMyLikeIds(likes);
             }
@@ -101,8 +131,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         try {
             const list = await listOrCreateProfiles(user);
-            // Protect against account switch / stale response
-            if (profileSeqRef.current !== currentSeq || auth.currentUser?.uid !== targetUid) return;
+            if (profileSeqRef.current !== currentSeq || authInstanceRef.current?.currentUser?.uid !== targetUid) return;
 
             setProfiles(list);
 
@@ -121,56 +150,94 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
     }, [user]);
 
-    // Firebase owns the session: it restores it from storage and refreshes the
-    // ID token on its own, so there is no token handling left in this app.
+    // Firebase owns the session: boot immediately for signed-in / auth routes,
+    // or defer briefly for first-time anonymous visitors browsing public pages.
     useEffect(() => {
-        return onAuthStateChanged(auth, async (fbUser) => {
-            const currentSeq = ++authSeqRef.current;
-            setUser(fbUser);
+        let disposed = false;
+        let unsubscribe: (() => void) | null = null;
+        let deferTimer: number | null = null;
 
-            if (!fbUser) {
-                setIsAdmin(false);
-                setProfiles([]);
-                setCurrentProfile(null);
-                setMyListIds([]);
-                setMyLikeIds([]);
-                localStorage.removeItem(PROFILE_KEY);
-                setIsLoading(false);
-                return;
-            }
-
-            // Reset lists and profiles immediately on account transition
-            setProfiles([]);
-            setCurrentProfile(null);
-            setMyListIds([]);
-            setMyLikeIds([]);
-
+        const initAuthListener = async () => {
             try {
-                await ensureUserDoc(fbUser);
-            } catch (error) {
-                console.error('Failed to create the Firestore user document', error);
-            }
+                const { auth, fbAuth } = await loadFirebaseAuth();
+                if (disposed) return;
+                authInstanceRef.current = auth;
 
-            if (authSeqRef.current !== currentSeq) return;
+                unsubscribe = fbAuth.onAuthStateChanged(auth, async (fbUser) => {
+                    if (disposed) return;
+                    const currentSeq = ++authSeqRef.current;
+                    setUser(fbUser);
 
-            try {
-                // Only the catalog backend can say whether this identity is an
-                // admin — never a client-held value, which the user could edit.
-                const identity = await getBackendIdentity();
-                if (authSeqRef.current === currentSeq) {
-                    setIsAdmin(identity.is_admin);
-                }
+                    if (!fbUser) {
+                        setIsAdmin(false);
+                        setProfiles([]);
+                        setCurrentProfile(null);
+                        setMyListIds([]);
+                        setMyLikeIds([]);
+                        try {
+                            localStorage.removeItem(PROFILE_KEY);
+                            localStorage.removeItem(HAS_AUTH_KEY);
+                        } catch {
+                            // Ignore storage errors
+                        }
+                        setIsLoading(false);
+                        return;
+                    }
+
+                    try {
+                        localStorage.setItem(HAS_AUTH_KEY, '1');
+                    } catch {
+                        // Ignore storage errors
+                    }
+
+                    setProfiles([]);
+                    setCurrentProfile(null);
+                    setMyListIds([]);
+                    setMyLikeIds([]);
+
+                    try {
+                        await ensureUserDoc(fbUser);
+                    } catch (error) {
+                        console.error('Failed to create the Firestore user document', error);
+                    }
+
+                    if (disposed || authSeqRef.current !== currentSeq) return;
+
+                    try {
+                        const identity = await getBackendIdentity();
+                        if (!disposed && authSeqRef.current === currentSeq) {
+                            setIsAdmin(identity.is_admin);
+                        }
+                    } catch (error) {
+                        if (!disposed && authSeqRef.current === currentSeq) {
+                            console.error('Failed to resolve admin status', error);
+                            setIsAdmin(false);
+                        }
+                    } finally {
+                        if (!disposed && authSeqRef.current === currentSeq) {
+                            setIsLoading(false);
+                        }
+                    }
+                });
             } catch (error) {
-                if (authSeqRef.current === currentSeq) {
-                    console.error('Failed to resolve admin status', error);
-                    setIsAdmin(false);
-                }
-            } finally {
-                if (authSeqRef.current === currentSeq) {
-                    setIsLoading(false);
-                }
+                console.error('Failed to initialize Firebase Auth', error);
+                if (!disposed) setIsLoading(false);
             }
-        });
+        };
+
+        if (shouldBootAuthImmediately()) {
+            void initAuthListener();
+        } else {
+            deferTimer = window.setTimeout(() => {
+                void initAuthListener();
+            }, 2500);
+        }
+
+        return () => {
+            disposed = true;
+            if (deferTimer !== null) window.clearTimeout(deferTimer);
+            if (unsubscribe) unsubscribe();
+        };
     }, []);
 
     useEffect(() => {
@@ -182,7 +249,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }, [updateLists]);
 
     const signInWithEmail = async (email: string, password: string) => {
-        await signInWithEmailAndPassword(auth, email, password);
+        const { auth, fbAuth } = await loadFirebaseAuth();
+        authInstanceRef.current = auth;
+        await fbAuth.signInWithEmailAndPassword(auth, email, password);
     };
 
     /** Sign-in already succeeded here; a failed profile write must not undo it. */
@@ -195,14 +264,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
 
     const registerWithEmail = async (email: string, password: string, fullName?: string) => {
-        const cred = await createUserWithEmailAndPassword(auth, email, password);
+        const { auth, fbAuth } = await loadFirebaseAuth();
+        authInstanceRef.current = auth;
+        const cred = await fbAuth.createUserWithEmailAndPassword(auth, email, password);
         if (fullName) {
-            await updateAuthProfile(cred.user, { displayName: fullName });
+            await fbAuth.updateProfile(cred.user, { displayName: fullName });
         }
         await seedUserDoc(cred.user);
     };
 
     const signInWithGoogle = async () => {
+        const { auth, googleProvider, fbAuth } = await loadFirebaseAuth();
+        authInstanceRef.current = auth;
+
         if (import.meta.env.MODE === 'mobile' && Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android') {
             const { FirebaseAuthentication } = await import('@capacitor-firebase/authentication');
             const result = await FirebaseAuthentication.signInWithGoogle({ skipNativeAuth: true });
@@ -210,14 +284,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             if (!idToken) {
                 throw new Error('Google sign-in did not return an ID token.');
             }
-            const credential = GoogleAuthProvider.credential(idToken);
-            const userCredential = await signInWithCredential(auth, credential);
+            const credential = fbAuth.GoogleAuthProvider.credential(idToken);
+            const userCredential = await fbAuth.signInWithCredential(auth, credential);
             await seedUserDoc(userCredential.user);
             return;
         }
 
-        const result = await signInWithPopup(auth, googleProvider);
-        GoogleAuthProvider.credentialFromResult(result);
+        const result = await fbAuth.signInWithPopup(auth, googleProvider, fbAuth.browserPopupRedirectResolver);
+        fbAuth.GoogleAuthProvider.credentialFromResult(result);
         await seedUserDoc(result.user);
     };
 
@@ -237,6 +311,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             localStorage.removeItem(`${PROFILE_KEY}_${uid}`);
         }
         localStorage.removeItem(PROFILE_KEY);
+        localStorage.removeItem(HAS_AUTH_KEY);
 
         if (import.meta.env.MODE === 'mobile' && Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android') {
             try {
@@ -246,7 +321,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 console.warn('Native Google sign-out failed or ignored:', err);
             }
         }
-        await signOut(auth);
+        const { auth, fbAuth } = await loadFirebaseAuth();
+        await fbAuth.signOut(auth);
     };
 
     const selectProfile = (profile: UserProfile) => {

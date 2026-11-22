@@ -79,29 +79,30 @@ def get_current_user(
         )
     except ValueError as exc:
         # Covers malformed tokens, bad signatures, wrong audience and expiry.
-        raise _credentials_exception(f"Invalid Firebase ID token: {exc}") from exc
+        # Keep error generic to avoid leaking internal JWT verification details.
+        raise _credentials_exception("Invalid authentication token") from exc
 
     if not claims:
-        raise _credentials_exception("Invalid Firebase ID token")
+        raise _credentials_exception("Invalid authentication token")
 
     uid = claims.get("user_id") or claims.get("sub")
     if not uid:
-        raise _credentials_exception("Token carries no subject")
+        raise _credentials_exception("Invalid authentication token")
 
     email = claims.get("email")
-    # A custom claim wins when present; the allowlist is the fallback that works
-    # without provisioning a service-account key to set claims.
+    email_verified = bool(claims.get("email_verified"))
+    # A custom claim or UID allowlist wins; email allowlist requires a verified email.
     is_admin = (
         claims.get("admin") is True
         or uid in admin_uids()
-        or (bool(email) and email.lower() in admin_emails())
+        or (email_verified and bool(email) and email.lower() in admin_emails())
     )
 
     return FirebaseUser(
         uid=uid,
         email=email,
         name=claims.get("name"),
-        email_verified=bool(claims.get("email_verified")),
+        email_verified=email_verified,
         is_admin=is_admin,
     )
 

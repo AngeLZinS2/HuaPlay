@@ -11,7 +11,6 @@
 
 import { Capacitor } from '@capacitor/core';
 import api from './api';
-import { app } from './firebase';
 import {
   setStoredDeviceToken,
   setStoredOptIn,
@@ -113,7 +112,10 @@ export async function unregisterNativePush(): Promise<void> {
 export async function deleteWebPushToken(): Promise<void> {
   if (typeof window !== 'undefined' && 'Notification' in window) {
     try {
-      const { getMessaging, deleteToken } = await import('firebase/messaging');
+      const [{ getMessaging, deleteToken }, { app }] = await Promise.all([
+        import('firebase/messaging'),
+        import('./firebase'),
+      ]);
       const messaging = getMessaging(app);
       await deleteToken(messaging);
     } catch {
@@ -267,7 +269,10 @@ export async function registerWebPushWithVapid(
   }
 
   try {
-    const { getMessaging, getToken, isSupported } = await import('firebase/messaging');
+    const [{ getMessaging, getToken, isSupported }, { app }] = await Promise.all([
+      import('firebase/messaging'),
+      import('./firebase'),
+    ]);
     const supported = await isSupported();
     if (!supported) {
       return { success: false, error: 'FCM não suportado neste navegador' };

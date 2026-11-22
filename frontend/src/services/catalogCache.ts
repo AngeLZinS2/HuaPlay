@@ -18,6 +18,45 @@ let currentCacheGeneration = 0;
 let inflightRequestId = 0;
 let activeRequestId = 0;
 
+declare global {
+    interface Window {
+        __HUAPLAY_HERO_PROMISE?: Promise<any | null>;
+    }
+}
+
+let sharedHeroPromise: Promise<any | null> | null = null;
+
+/**
+ * Returns the hero-featured promise kicked off early in index.html (if present),
+ * or starts a single deduplicated request to /series/hero-featured.
+ */
+export function getHeroFeaturedEarly(signal?: AbortSignal): Promise<any | null> {
+    const cached = getCachedPublicCatalog();
+    if (cached && !cached.isStale && cached.data.heroFeatured) {
+        return Promise.resolve(cached.data.heroFeatured);
+    }
+    if (!sharedHeroPromise) {
+        if (typeof window !== 'undefined' && window.__HUAPLAY_HERO_PROMISE) {
+            sharedHeroPromise = window.__HUAPLAY_HERO_PROMISE.then((data) => {
+                if (data) return data;
+                return api.get('/series/hero-featured').then((r) => r.data || null).catch(() => null);
+            });
+            delete window.__HUAPLAY_HERO_PROMISE;
+        } else {
+            sharedHeroPromise = api
+                .get('/series/hero-featured', { signal })
+                .then((r) => r.data || null)
+                .catch(() => null);
+        }
+        sharedHeroPromise.finally(() => {
+            setTimeout(() => {
+                sharedHeroPromise = null;
+            }, 3000);
+        });
+    }
+    return sharedHeroPromise;
+}
+
 export const formatSeriesItem = (item: any) => ({
     id: item.id,
     title: item.title,
@@ -66,9 +105,9 @@ export async function fetchPublicCatalogWithDedup(signal?: AbortSignal): Promise
 
         const promise: Promise<PublicCatalogData> = (async () => {
             try {
-                // Concurrent requests for hero and sections using internal timeout-controlled signal
+                // Concurrent requests for hero (reusing early index.html fetch when available) and sections
                 const [heroRes, sectionsRes] = await Promise.allSettled([
-                    api.get('/series/hero-featured', { signal: internalSignal }),
+                    getHeroFeaturedEarly(internalSignal).then((data) => ({ data })),
                     api.get('/home/sections', { signal: internalSignal }),
                 ]);
 

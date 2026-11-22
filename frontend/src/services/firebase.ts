@@ -1,6 +1,11 @@
 import { initializeApp } from 'firebase/app';
-import { GoogleAuthProvider, getAuth } from 'firebase/auth';
-import { getFirestore } from 'firebase/firestore';
+import {
+    GoogleAuthProvider,
+    browserLocalPersistence,
+    indexedDBLocalPersistence,
+    initializeAuth,
+} from 'firebase/auth';
+import type { Firestore } from 'firebase/firestore';
 
 /**
  * Firebase project: gtavi-6991d ("HuaPlay")
@@ -22,8 +27,23 @@ const firebaseConfig = {
 };
 
 export const app = initializeApp(firebaseConfig);
-export const auth = getAuth(app);
-export const db = getFirestore(app);
+
+// Omit popupRedirectResolver at startup so Firebase doesn't inject the
+// ~134KB third-party auth iframe + gapi scripts on public page loads.
+// browserPopupRedirectResolver is passed directly to signInWithPopup on demand.
+export const auth = initializeAuth(app, {
+    persistence: [indexedDBLocalPersistence, browserLocalPersistence],
+});
+
+let firestorePromise: Promise<Firestore> | null = null;
+
+/** Lazily loads the Firestore SDK only when a signed-in user reads/writes user data. */
+export function getFirestoreDb(): Promise<Firestore> {
+    if (!firestorePromise) {
+        firestorePromise = import('firebase/firestore').then(({ getFirestore }) => getFirestore(app));
+    }
+    return firestorePromise;
+}
 
 export const googleProvider = new GoogleAuthProvider();
 // Always let the user pick an account rather than silently reusing the last one.

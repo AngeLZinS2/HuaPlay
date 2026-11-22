@@ -1,25 +1,13 @@
-import {
-    Timestamp,
-    collection,
-    deleteDoc,
-    doc,
-    getDoc,
-    getDocs,
-    limit as fsLimit,
-    orderBy,
-    query,
-    runTransaction,
-    serverTimestamp,
-    setDoc,
-    where,
-} from 'firebase/firestore';
+import type { Timestamp } from 'firebase/firestore';
 import type { User } from 'firebase/auth';
-import { db } from './firebase';
 
 /**
  * Per-user data in Firestore. The catalog (series, episodes, actors) stays in
  * the FastAPI backend — Firestore holds only what belongs to a signed-in user,
  * under users/{uid}/..., which is exactly what firestore.rules guards.
+ *
+ * The Firestore SDK (~330KB) is loaded lazily on first call so anonymous
+ * visitors browsing the public catalog never pay its download/parse cost.
  */
 
 export interface UserProfile {
@@ -43,39 +31,42 @@ const DEFAULT_AVATAR =
 
 export const MAX_PROFILES = 3;
 
-const profilesCol = (uid: string) => collection(db, 'users', uid, 'profiles');
-const profileDoc = (uid: string, profileId: string) => doc(db, 'users', uid, 'profiles', profileId);
-const subCol = (uid: string, profileId: string, name: string) =>
-    collection(db, 'users', uid, 'profiles', profileId, name);
-const subDoc = (uid: string, profileId: string, name: string, id: string | number) =>
-    doc(db, 'users', uid, 'profiles', profileId, name, String(id));
+async function loadFs() {
+    const [fs, { getFirestoreDb }] = await Promise.all([
+        import('firebase/firestore'),
+        import('./firebase'),
+    ]);
+    const db = await getFirestoreDb();
+    return { fs, db };
+}
 
 // ---------------------------------------------------------------- user doc
 
 /** Creates or refreshes users/{uid}. Safe to call on every sign-in. */
 export async function ensureUserDoc(user: User): Promise<void> {
-    const ref = doc(db, 'users', user.uid);
-    const snap = await getDoc(ref);
+    const { fs, db } = await loadFs();
+    const ref = fs.doc(db, 'users', user.uid);
+    const snap = await fs.getDoc(ref);
     const displayName = user.displayName || user.email?.split('@')[0] || 'Usuario';
 
     if (!snap.exists()) {
-        await setDoc(ref, {
+        await fs.setDoc(ref, {
             email: user.email ?? '',
             displayName,
             ...(user.photoURL ? { photoUrl: user.photoURL } : {}),
-            createdAt: serverTimestamp(),
-            updatedAt: serverTimestamp(),
+            createdAt: fs.serverTimestamp(),
+            updatedAt: fs.serverTimestamp(),
         });
         return;
     }
     // email and createdAt are immutable per the security rules, so they are
     // deliberately re-sent unchanged rather than omitted.
-    await setDoc(ref, {
+    await fs.setDoc(ref, {
         email: snap.data().email,
         displayName,
         ...(user.photoURL ? { photoUrl: user.photoURL } : {}),
         createdAt: snap.data().createdAt,
-        updatedAt: serverTimestamp(),
+        updatedAt: fs.serverTimestamp(),
     });
 }
 
@@ -87,7 +78,9 @@ export const DEFAULT_PROFILE_ID = 'default';
 const bootstrapInFlight = new Map<string, Promise<UserProfile[]>>();
 
 export async function listProfiles(uid: string): Promise<UserProfile[]> {
-    const snap = await getDocs(query(profilesCol(uid), orderBy('createdAt', 'asc')));
+    const { fs, db } = await loadFs();
+    const profilesCol = fs.collection(db, 'users', uid, 'profiles');
+    const snap = await fs.getDocs(fs.query(profilesCol, fs.orderBy('createdAt', 'asc')));
     return snap.docs.map((d) => ({
         id: d.id,
         name: d.data().name,
@@ -113,29 +106,27 @@ export async function listOrCreateProfiles(user: User): Promise<UserProfile[]> {
 
     const task = (async () => {
         try {
-            // First check if any profiles already exist
             const existing = await listProfiles(uid);
             if (existing.length > 0) {
                 return existing;
             }
 
-            const defaultRef = profileDoc(uid, DEFAULT_PROFILE_ID);
+            const { fs, db } = await loadFs();
+            const defaultRef = fs.doc(db, 'users', uid, 'profiles', DEFAULT_PROFILE_ID);
             const defaultName = user.displayName || user.email?.split('@')[0] || 'Principal';
             const defaultAvatar = user.photoURL || DEFAULT_AVATAR;
 
-            // Use runTransaction on deterministic document reference to serialize cross-device creation
-            await runTransaction(db, async (txn) => {
+            await fs.runTransaction(db, async (txn) => {
                 const snap = await txn.get(defaultRef);
                 if (!snap.exists()) {
                     txn.set(defaultRef, {
                         name: defaultName,
                         avatarUrl: defaultAvatar,
-                        createdAt: serverTimestamp(),
+                        createdAt: fs.serverTimestamp(),
                     });
                 }
             });
 
-            // Re-read full profiles list to guarantee all profiles (including any created concurrently) are present
             const refreshed = await listProfiles(uid);
             if (refreshed.length > 0) {
                 return refreshed;
@@ -162,11 +153,12 @@ export async function createProfile(
     if (existing.length >= MAX_PROFILES) {
         throw new Error('Maximo de ' + MAX_PROFILES + ' perfis por conta');
     }
-    const ref = doc(profilesCol(uid));
-    await setDoc(ref, {
+    const { fs, db } = await loadFs();
+    const ref = fs.doc(fs.collection(db, 'users', uid, 'profiles'));
+    await fs.setDoc(ref, {
         name: data.name,
         avatarUrl: data.avatarUrl || DEFAULT_AVATAR,
-        createdAt: serverTimestamp(),
+        createdAt: fs.serverTimestamp(),
     });
     return { id: ref.id, name: data.name, avatarUrl: data.avatarUrl || DEFAULT_AVATAR };
 }
@@ -176,11 +168,13 @@ export async function updateProfile(
     profileId: string,
     data: { name?: string; avatarUrl?: string | null },
 ): Promise<void> {
-    const snap = await getDoc(profileDoc(uid, profileId));
+    const { fs, db } = await loadFs();
+    const ref = fs.doc(db, 'users', uid, 'profiles', profileId);
+    const snap = await fs.getDoc(ref);
     if (!snap.exists()) throw new Error('Perfil nao encontrado');
     const current = snap.data();
     // The rules validate the whole document on update, so resend every field.
-    await setDoc(profileDoc(uid, profileId), {
+    await fs.setDoc(ref, {
         name: data.name ?? current.name,
         avatarUrl: data.avatarUrl ?? current.avatarUrl ?? DEFAULT_AVATAR,
         createdAt: current.createdAt,
@@ -188,35 +182,43 @@ export async function updateProfile(
 }
 
 export async function deleteProfile(uid: string, profileId: string): Promise<void> {
-    await deleteDoc(profileDoc(uid, profileId));
+    const { fs, db } = await loadFs();
+    await fs.deleteDoc(fs.doc(db, 'users', uid, 'profiles', profileId));
 }
 
 // ---------------------------------------------------- likes and my list
 
 async function listSeriesIds(uid: string, profileId: string, name: string): Promise<number[]> {
-    const snap = await getDocs(subCol(uid, profileId, name));
+    const { fs, db } = await loadFs();
+    const snap = await fs.getDocs(fs.collection(db, 'users', uid, 'profiles', profileId, name));
     return snap.docs.map((d) => d.data().seriesId as number).filter((n) => Number.isFinite(n));
 }
 
 async function addSeriesRef(uid: string, profileId: string, name: string, seriesId: number) {
-    await setDoc(subDoc(uid, profileId, name, seriesId), {
+    const { fs, db } = await loadFs();
+    await fs.setDoc(fs.doc(db, 'users', uid, 'profiles', profileId, name, String(seriesId)), {
         seriesId,
-        createdAt: serverTimestamp(),
+        createdAt: fs.serverTimestamp(),
     });
+}
+
+async function deleteSeriesRef(uid: string, profileId: string, name: string, seriesId: number) {
+    const { fs, db } = await loadFs();
+    await fs.deleteDoc(fs.doc(db, 'users', uid, 'profiles', profileId, name, String(seriesId)));
 }
 
 export const listLikes = (uid: string, profileId: string) => listSeriesIds(uid, profileId, 'likes');
 export const likeSeries = (uid: string, profileId: string, seriesId: number) =>
     addSeriesRef(uid, profileId, 'likes', seriesId);
 export const unlikeSeries = (uid: string, profileId: string, seriesId: number) =>
-    deleteDoc(subDoc(uid, profileId, 'likes', seriesId));
+    deleteSeriesRef(uid, profileId, 'likes', seriesId);
 
 export const listMyList = (uid: string, profileId: string) =>
     listSeriesIds(uid, profileId, 'myList');
 export const addToMyList = (uid: string, profileId: string, seriesId: number) =>
     addSeriesRef(uid, profileId, 'myList', seriesId);
 export const removeFromMyList = (uid: string, profileId: string, seriesId: number) =>
-    deleteDoc(subDoc(uid, profileId, 'myList', seriesId));
+    deleteSeriesRef(uid, profileId, 'myList', seriesId);
 
 // ------------------------------------------------------------ watch history
 
@@ -225,14 +227,15 @@ export async function recordWatch(
     profileId: string,
     entry: Omit<WatchEntry, 'updatedAt'>,
 ): Promise<void> {
-    await setDoc(subDoc(uid, profileId, 'watchHistory', entry.episodeId), {
+    const { fs, db } = await loadFs();
+    await fs.setDoc(fs.doc(db, 'users', uid, 'profiles', profileId, 'watchHistory', String(entry.episodeId)), {
         episodeId: entry.episodeId,
         seriesId: entry.seriesId,
         episodeNumber: entry.episodeNumber,
         timestampSeconds: Math.max(0, Math.min(86400, Math.floor(entry.timestampSeconds))),
         completed: entry.completed,
         isEstimated: entry.isEstimated,
-        updatedAt: serverTimestamp(),
+        updatedAt: fs.serverTimestamp(),
     });
 }
 
@@ -252,8 +255,12 @@ export async function getSeriesProgress(
     profileId: string,
     seriesId: number,
 ): Promise<WatchEntry[]> {
-    const snap = await getDocs(
-        query(subCol(uid, profileId, 'watchHistory'), where('seriesId', '==', seriesId)),
+    const { fs, db } = await loadFs();
+    const snap = await fs.getDocs(
+        fs.query(
+            fs.collection(db, 'users', uid, 'profiles', profileId, 'watchHistory'),
+            fs.where('seriesId', '==', seriesId),
+        ),
     );
     return snap.docs.map((d) => toEntry(d.data()));
 }
@@ -264,8 +271,13 @@ export async function getRecentlyWatched(
     profileId: string,
     max = 20,
 ): Promise<WatchEntry[]> {
-    const snap = await getDocs(
-        query(subCol(uid, profileId, 'watchHistory'), orderBy('updatedAt', 'desc'), fsLimit(max)),
+    const { fs, db } = await loadFs();
+    const snap = await fs.getDocs(
+        fs.query(
+            fs.collection(db, 'users', uid, 'profiles', profileId, 'watchHistory'),
+            fs.orderBy('updatedAt', 'desc'),
+            fs.limit(max),
+        ),
     );
     return snap.docs.map((d) => toEntry(d.data()));
 }

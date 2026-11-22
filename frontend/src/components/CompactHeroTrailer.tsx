@@ -137,6 +137,7 @@ export const CompactHeroTrailer: React.FC<CompactHeroTrailerProps> = ({
 
                 try {
                     playerInstance = new yt.Player(childMount, {
+                        host: 'https://www.youtube-nocookie.com',
                         videoId,
                         width: '100%',
                         height: '100%',

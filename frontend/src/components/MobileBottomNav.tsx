@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useState, lazy, Suspense } from 'react';
 import { Compass, Heart, Home, Search, User } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
-import SearchModal from './SearchModal';
 import { prefetchPublicRoute } from '../App';
+
+const SearchModal = lazy(() => import('./SearchModal'));
 
 const items = [
     { label: 'Início', href: '/', icon: Home },
@@ -85,7 +86,11 @@ export default function MobileBottomNav() {
                 </div>
             </nav>
 
-            <SearchModal isOpen={isSearchOpen} onClose={() => setIsSearchOpen(false)} />
+            {isSearchOpen && (
+                <Suspense fallback={null}>
+                    <SearchModal isOpen={isSearchOpen} onClose={() => setIsSearchOpen(false)} />
+                </Suspense>
+            )}
         </>
     );
 }

@@ -1,5 +1,4 @@
 import axios from 'axios';
-import { auth } from './firebase';
 import type {
     Actor,
     ActorCreate,
@@ -10,6 +9,14 @@ import type {
     SeriesCreate,
     SeriesStats,
 } from '../types/models';
+
+type AuthTokenProvider = () => Promise<string | null>;
+let authTokenProvider: AuthTokenProvider | null = null;
+
+/** Registered lazily once Firebase Auth boots so public catalog requests never block on Firebase SDK. */
+export function registerAuthTokenProvider(provider: AuthTokenProvider | null): void {
+    authTokenProvider = provider;
+}
 
 // In a Capacitor native app, window.location.hostname is "localhost" (inside WebView),
 // so we fall back to the known server IP set via VITE_API_URL env variable.
@@ -35,14 +42,16 @@ const api = axios.create({
     timeout: 10000, // 10s timeout — prevents hanging when backend is restarting
 });
 
-// Attach the Firebase ID token. getIdToken() serves a cached token and only
-// hits the network when it is close to expiring, so this is cheap per request.
+// Attach the Firebase ID token once Auth is loaded. getIdToken() serves a cached
+// token and only hits the network when it is close to expiring, so this is cheap.
 api.interceptors.request.use(
     async (config) => {
-        const user = auth.currentUser;
-        if (user) {
+        if (authTokenProvider) {
             try {
-                config.headers.Authorization = `Bearer ${await user.getIdToken()}`;
+                const token = await authTokenProvider();
+                if (token) {
+                    config.headers.Authorization = `Bearer ${token}`;
+                }
             } catch (error) {
                 console.error('Failed to attach Firebase ID token', error);
             }

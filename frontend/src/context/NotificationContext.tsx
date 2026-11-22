@@ -162,10 +162,15 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  // Single visibility-aware polling lifecycle across entire app
+  // Single visibility-aware polling lifecycle across entire app (deferred slightly so Hero LCP wins first)
   useEffect(() => {
+    let initialTimer: number | null = null;
     if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
-      void loadFeed();
+      initialTimer = window.setTimeout(() => {
+        if (document.visibilityState === 'visible') {
+          void loadFeed();
+        }
+      }, 1800);
     }
 
     const startTimer = () => {
@@ -193,6 +198,9 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     document.addEventListener('visibilitychange', handleVisibilityChange);
 
     return () => {
+      if (initialTimer !== null) {
+        window.clearTimeout(initialTimer);
+      }
       if (pollTimerRef.current !== null) {
         window.clearInterval(pollTimerRef.current);
       }
