@@ -12,7 +12,6 @@ import {
     fetchPublicCatalogWithDedup,
     formatSeriesList,
     getHeroFeaturedEarly,
-    getInitialSsrHero,
 } from '../services/catalogCache';
 
 export default function Home() {
@@ -22,14 +21,12 @@ export default function Home() {
     const [becauseYouWatched, setBecauseYouWatched] = useState<{ base: any; list: any[] } | null>(null);
     const [isPersonalized, setIsPersonalized] = useState(false);
 
-    // Initial state restored from limited TTL public cache or SSI-inlined Hero for instant Frame-0 LCP
+    // Initial state restored from limited TTL public cache; SSI hero hydrates on next effect tick
+    // so the initial shell frame commits cleanly without a synchronous first-frame GPU upload stall.
     const initialCached = getCachedPublicCatalog();
-    const initialSsrHero = getInitialSsrHero();
     const [loading, setLoading] = useState(!initialCached);
     const [heroFeatured, setHeroFeatured] = useState<any | null | undefined>(
-        initialCached?.data.heroFeatured !== undefined
-            ? initialCached.data.heroFeatured
-            : (initialSsrHero ?? undefined)
+        initialCached?.data.heroFeatured !== undefined ? initialCached.data.heroFeatured : undefined
     );
     const [managedRows, setManagedRows] = useState(initialCached?.data.managedRows ?? []);
     const [hasManagedHome, setHasManagedHome] = useState(initialCached?.data.hasManagedHome ?? false);
