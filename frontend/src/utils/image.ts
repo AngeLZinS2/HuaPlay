@@ -18,9 +18,14 @@ export const getOptimizedImageUrl = (
         if (type === 'thumbnail') size = 'w185';
         if (type === 'backdrop') size = 'w1280';
 
-        // Extract relative path e.g. /t/p/w500/abc.jpg -> /t/p/w342/abc.jpg
-        const tmdbPath = cleanUrl.replace(/^https?:\/\/image\.tmdb\.org\/t\/p\/[^\/]+\//, `/t/p/${size}/`);
-        
+        // Extract filename e.g. /t/p/w500/abc.jpg -> abc.jpg
+        const match = cleanUrl.match(/^https?:\/\/image\.tmdb\.org\/t\/p\/[^/]+\/([A-Za-z0-9_.-]+)$/);
+        if (match && typeof window !== 'undefined' && window.location.hostname === 'huaplay.playdb.info') {
+            // Same-origin HTTP/2 cached proxy (zero extra DNS/TLS handshake on web)
+            return `/img/tmdb/${size}/${match[1]}`;
+        }
+
+        const tmdbPath = cleanUrl.replace(/^https?:\/\/image\.tmdb\.org\/t\/p\/[^/]+\//, `/t/p/${size}/`);
         // Proxy through Jetpack Global Edge CDN (i0.wp.com) with automatic WebP + quality compression
         return `https://i0.wp.com/image.tmdb.org${tmdbPath}?quality=75&strip=all`;
     }

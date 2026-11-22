@@ -9,7 +9,7 @@
   <meta name="theme-color" content="#050505" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link rel="preconnect" href="https://i0.wp.com" crossorigin />
+  <!--# include virtual="/api/series/hero-ssr-head" -->
   <link
     rel="stylesheet"
     href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Inter:wght@300;400;600&display=swap"
@@ -37,8 +37,8 @@
       }
 
       // Kick off hero-featured fetch + LCP image preload on Home immediately
-      // while the JS bundle is still downloading (eliminates API->IMG waterfall).
-      if (window.location.pathname === '/' && window.location.protocol.indexOf('http') === 0 && window.location.hostname !== 'localhost') {
+      // when SSI didn't already inline window.__HUAPLAY_HERO_DATA.
+      if (!window.__HUAPLAY_HERO_DATA && window.location.pathname === '/' && window.location.protocol.indexOf('http') === 0 && window.location.hostname !== 'localhost') {
         var isDesktopViewport = window.innerWidth >= 1024;
         window.__HUAPLAY_HERO_PROMISE = fetch('/api/series/hero-featured', { credentials: 'omit' })
           .then(function (res) { return res.ok ? res.json() : null; })

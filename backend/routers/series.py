@@ -3,7 +3,9 @@ from functools import lru_cache
 import os
 import re
 import requests
+import json
 from fastapi import APIRouter, Depends, HTTPException, status, Response
+from fastapi.responses import HTMLResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
@@ -150,6 +152,59 @@ def get_hero_featured(db: Session = Depends(get_db)):
         return _with_hero_summary(pool[time_slot])
 
     raise HTTPException(status_code=404, detail="No series available for hero featured")
+
+
+_TMDB_PATH_RE = re.compile(r"^https?://image\.tmdb\.org/t/p/[^/]+/([A-Za-z0-9_.-]+)$")
+
+
+def _to_same_origin_tmdb(url: Optional[str], size: str) -> Optional[str]:
+    if not url:
+        return None
+    clean = url.strip()
+    m = _TMDB_PATH_RE.match(clean)
+    if m:
+        return f"/img/tmdb/{size}/{m.group(1)}"
+    return clean if clean.startswith("https://") else None
+
+
+@router.get("/hero-ssr-head", response_class=HTMLResponse, include_in_schema=False)
+def get_hero_ssr_head(db: Session = Depends(get_db)):
+    """Tiny HTML fragment included via Nginx SSI on / for zero-waterfall LCP."""
+    try:
+        series = get_hero_featured(db)
+    except HTTPException:
+        return HTMLResponse(content="", headers={"Cache-Control": "public, max-age=10"})
+
+    payload = {
+        "id": series.id,
+        "title": series.title,
+        "slug": series.slug,
+        "type": series.type,
+        "genre": series.genre,
+        "release_year": series.release_year,
+        "status": series.status,
+        "description": series.description,
+        "cover_image": series.cover_image,
+        "banner_image": series.banner_image,
+        "trailer_url": series.trailer_url,
+        "feature_type": series.feature_type,
+    }
+    safe_json = json.dumps(payload, ensure_ascii=False).replace("<", "\\u003c").replace(">", "\\u003e").replace("&", "\\u0026")
+
+    mobile_img = _to_same_origin_tmdb(series.cover_image or series.banner_image, "w342")
+    desktop_img = _to_same_origin_tmdb(series.banner_image or series.cover_image, "w1280")
+
+    parts = []
+    if mobile_img:
+        parts.append(f'<link rel="preload" as="image" fetchpriority="high" href="{mobile_img}" media="(max-width: 1023px)" />')
+    if desktop_img:
+        parts.append(f'<link rel="preload" as="image" fetchpriority="high" href="{desktop_img}" media="(min-width: 1024px)" />')
+    parts.append(f"<script>window.__HUAPLAY_HERO_DATA={safe_json};</script>")
+
+    return HTMLResponse(
+        content="\n".join(parts),
+        headers={"Cache-Control": "public, max-age=30"},
+    )
 
 @router.get("/stats")
 def get_stats(db: Session = Depends(get_db)):

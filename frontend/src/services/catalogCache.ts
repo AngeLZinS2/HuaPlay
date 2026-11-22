@@ -21,19 +21,32 @@ let activeRequestId = 0;
 declare global {
     interface Window {
         __HUAPLAY_HERO_PROMISE?: Promise<any | null>;
+        __HUAPLAY_HERO_DATA?: any | null;
     }
 }
 
 let sharedHeroPromise: Promise<any | null> | null = null;
 
+/** Synchronous access to Hero JSON inlined by Nginx SSI on / (zero-waterfall LCP). */
+export function getInitialSsrHero(): any | null {
+    if (typeof window !== 'undefined' && window.__HUAPLAY_HERO_DATA) {
+        return window.__HUAPLAY_HERO_DATA;
+    }
+    return null;
+}
+
 /**
- * Returns the hero-featured promise kicked off early in index.html (if present),
+ * Returns the hero-featured data/promise kicked off early in index.html (SSI or fetch),
  * or starts a single deduplicated request to /series/hero-featured.
  */
 export function getHeroFeaturedEarly(signal?: AbortSignal): Promise<any | null> {
     const cached = getCachedPublicCatalog();
     if (cached && !cached.isStale && cached.data.heroFeatured) {
         return Promise.resolve(cached.data.heroFeatured);
+    }
+    const ssrHero = getInitialSsrHero();
+    if (ssrHero) {
+        return Promise.resolve(ssrHero);
     }
     if (!sharedHeroPromise) {
         if (typeof window !== 'undefined' && window.__HUAPLAY_HERO_PROMISE) {

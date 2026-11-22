@@ -12,6 +12,7 @@ import {
     fetchPublicCatalogWithDedup,
     formatSeriesList,
     getHeroFeaturedEarly,
+    getInitialSsrHero,
 } from '../services/catalogCache';
 
 export default function Home() {
@@ -21,11 +22,14 @@ export default function Home() {
     const [becauseYouWatched, setBecauseYouWatched] = useState<{ base: any; list: any[] } | null>(null);
     const [isPersonalized, setIsPersonalized] = useState(false);
 
-    // Initial state restored from limited TTL public cache for instantaneous route transitions
+    // Initial state restored from limited TTL public cache or SSI-inlined Hero for instant Frame-0 LCP
     const initialCached = getCachedPublicCatalog();
+    const initialSsrHero = getInitialSsrHero();
     const [loading, setLoading] = useState(!initialCached);
     const [heroFeatured, setHeroFeatured] = useState<any | null | undefined>(
-        initialCached?.data.heroFeatured !== undefined ? initialCached.data.heroFeatured : undefined
+        initialCached?.data.heroFeatured !== undefined
+            ? initialCached.data.heroFeatured
+            : (initialSsrHero ?? undefined)
     );
     const [managedRows, setManagedRows] = useState(initialCached?.data.managedRows ?? []);
     const [hasManagedHome, setHasManagedHome] = useState(initialCached?.data.hasManagedHome ?? false);
