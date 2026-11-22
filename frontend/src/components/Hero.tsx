@@ -146,12 +146,12 @@ function CompactHeroCard({
                 {/* Conteúdo flutuante dentro do cartão */}
                 <div className="relative z-10 px-4 pb-4 pt-4 sm:pt-6 flex flex-col items-center text-center">
                     {/* Título */}
-                    <h1 className="text-2xl sm:text-3xl font-display font-bold text-white tracking-wide drop-shadow-[0_2px_10px_rgba(0,0,0,0.9)] line-clamp-2 leading-tight max-w-[92%]">
+                    <h1 className="text-2xl sm:text-3xl font-display font-bold text-white tracking-wide [text-shadow:0_2px_10px_rgba(0,0,0,0.9)] line-clamp-2 leading-tight max-w-[92%]">
                         {featured.title}
                     </h1>
 
                     {/* Gêneros/Tags mínimos: UMA linha truncada sem quebras */}
-                    <div className="flex items-center justify-center flex-nowrap overflow-hidden max-w-[92%] truncate text-xs text-gray-200 font-medium tracking-wide mt-1.5 mb-3 sm:mt-2 sm:mb-4 drop-shadow">
+                    <div className="flex items-center justify-center flex-nowrap overflow-hidden max-w-[92%] truncate text-xs text-gray-200 font-medium tracking-wide mt-1.5 mb-3 sm:mt-2 sm:mb-4 [text-shadow:0_1px_4px_rgba(0,0,0,0.85)]">
                         {mobileTags.map((tag, idx) => (
                             <span key={idx} className="flex items-center gap-2 shrink-0">
                                 <span className="truncate">{tag}</span>

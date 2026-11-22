@@ -46,7 +46,9 @@ export function getHeroFeaturedEarly(signal?: AbortSignal): Promise<any | null> 
     }
     const ssrHero = getInitialSsrHero();
     if (ssrHero) {
-        return Promise.resolve(ssrHero);
+        return new Promise((resolve) => {
+            window.setTimeout(() => resolve(ssrHero), 0);
+        });
     }
     if (!sharedHeroPromise) {
         if (typeof window !== 'undefined' && window.__HUAPLAY_HERO_PROMISE) {
