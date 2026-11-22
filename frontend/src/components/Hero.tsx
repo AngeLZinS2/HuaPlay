@@ -214,7 +214,7 @@ export default function Hero({ initialFeatured, featuredPromise }: HeroProps = {
     const { uid, currentProfile, myListIds, updateLists, isAuthenticated } = useAuth();
     const { addToast } = useToast();
 
-    // Reset de estados desktop ao mudar conteúdo ou modo + defer do iframe YouTube após LCP
+    // Reset de estados desktop ao mudar conteúdo ou modo + defer do iframe YouTube após LCP/interação
     useEffect(() => {
         setDesktopMuted(true);
         setDesktopPlaying(false);
@@ -222,10 +222,24 @@ export default function Hero({ initialFeatured, featuredPromise }: HeroProps = {
         setDesktopTrailerReady(false);
 
         if (heroMode !== 'desktop') return;
-        const timer = window.setTimeout(() => {
+        let triggered = false;
+        const activate = () => {
+            if (triggered) return;
+            triggered = true;
             setDesktopTrailerReady(true);
-        }, 4200);
-        return () => window.clearTimeout(timer);
+            cleanup();
+        };
+        const cleanup = () => {
+            window.removeEventListener('pointermove', activate);
+            window.removeEventListener('scroll', activate);
+            window.removeEventListener('keydown', activate);
+            window.clearTimeout(timer);
+        };
+        window.addEventListener('pointermove', activate, { once: true, passive: true });
+        window.addEventListener('scroll', activate, { once: true, passive: true });
+        window.addEventListener('keydown', activate, { once: true, passive: true });
+        const timer = window.setTimeout(activate, 7500);
+        return cleanup;
     }, [featured?.id, featured?.trailer_url, heroMode]);
 
     const isInList = featured ? myListIds.includes(Number(featured.id)) : false;

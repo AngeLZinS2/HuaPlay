@@ -11,7 +11,7 @@ export default defineConfig(({ mode }) => ({
       : [
           VitePWA({
             registerType: 'autoUpdate',
-            injectRegister: 'script-defer',
+            injectRegister: null,
             includeAssets: ['sakura.png', 'logo-wei.webp'],
             manifest: {
               name: 'HuaPlay',

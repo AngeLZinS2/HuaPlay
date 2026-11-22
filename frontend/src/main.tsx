@@ -18,3 +18,12 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
     </BrowserRouter>
   </React.StrictMode>,
 );
+
+// Register PWA service worker lazily after load so Workbox precaching never blocks FCP/LCP/TBT
+if (import.meta.env.PROD && import.meta.env.MODE !== 'mobile' && 'serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    window.setTimeout(() => {
+      navigator.serviceWorker.register('/sw.js', { scope: '/' }).catch(() => {});
+    }, 6500);
+  }, { once: true });
+}
