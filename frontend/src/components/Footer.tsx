@@ -34,6 +34,15 @@ export default function Footer() {
                             <li><Link to="/privacy" className={linkClass}>Privacidade</Link></li>
                             <li><Link to="/copyright" className={linkClass}>Direitos autorais</Link></li>
                             <li><Link to="/contact" className={linkClass}>Contato</Link></li>
+                            <li>
+                                <button
+                                    type="button"
+                                    onClick={() => window.dispatchEvent(new CustomEvent('huaplay:open-intro'))}
+                                    className={linkClass}
+                                >
+                                    Guia & Baixar App
+                                </button>
+                            </li>
                         </ul>
                     </div>
 

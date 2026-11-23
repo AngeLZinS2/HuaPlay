@@ -1,10 +1,10 @@
 {
-  "versionCode": 12,
-  "versionName": "1.0.11",
-  "apkUrl": "https://huaplay.playdb.info/downloads/huaplay/HuaPlay-1.0.11.apk",
-  "sha256": "2925c7d0cc8226a3367953cb4d6aa42ce71d2e366f856e7ec25666717fb624af",
+  "versionCode": 13,
+  "versionName": "1.0.12",
+  "apkUrl": "https://huaplay.playdb.info/downloads/huaplay/HuaPlay-1.0.12.apk",
+  "sha256": "6bcfa68e341823246de13454accd926dfd04188a3b2dd6d0ca20db492b32d729",
   "releaseNotes": [
-    "Otimizacao massiva de desempenho na Home e navegacao (carregamento inicial ate 3x mais rapido, imagens WebP e fileiras sob demanda)",
-    "Melhorias de acessibilidade, SEO e reforco de seguranca na API e servidor"
+    "Novo popout animado de introducao no primeiro acesso (site e APK) explicando o que e e como funciona o HuaPlay",
+    "Guia interativo com icones e setas animadas para baixar o APK Android e instalar o PWA no Apple iOS e Desktop"
   ]
 }

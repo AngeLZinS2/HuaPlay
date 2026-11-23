@@ -6,6 +6,9 @@ import './index.css';
 
 import { AuthProvider } from './context/AuthContext';
 import { ToastProvider } from './context/ToastContext';
+import { initPwaInstallCapture } from './utils/pwaInstall';
+
+initPwaInstallCapture();
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>

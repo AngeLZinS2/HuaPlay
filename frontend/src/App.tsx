@@ -14,6 +14,10 @@ const AdminLayout = lazy(() => import('./components/admin/AdminLayout'));
 const RequireAdmin = lazy(() => import('./components/admin/RequireAdmin'));
 const SeriesDetailsModal = lazy(() => import('./components/SeriesDetailsModal'));
 const ShakeToReport = lazy(() => import('./components/ShakeToReport'));
+const IntroOnboardingModal = lazy(() => import('./components/IntroOnboardingModal'));
+
+const INTRO_SEEN_KEY = 'huaplay_intro_seen_v1';
+const OPEN_INTRO_EVENT = 'huaplay:open-intro';
 
 function LazySeriesDetailsModal() {
   const { isOpen } = useModal();
@@ -40,6 +44,61 @@ function DeferredShakeToReport() {
   return (
     <Suspense fallback={null}>
       <ShakeToReport />
+    </Suspense>
+  );
+}
+
+function DeferredIntroOnboarding() {
+  const location = useLocation();
+  const [shouldMount, setShouldMount] = useState(false);
+  const [isOpen, setIsOpen] = useState(false);
+
+  const isExcludedRoute = ['/login', '/profiles'].includes(location.pathname);
+
+  useEffect(() => {
+    const handleManualOpen = () => {
+      setShouldMount(true);
+      setIsOpen(true);
+    };
+    window.addEventListener(OPEN_INTRO_EVENT, handleManualOpen);
+    return () => window.removeEventListener(OPEN_INTRO_EVENT, handleManualOpen);
+  }, []);
+
+  useEffect(() => {
+    if (isExcludedRoute) return;
+
+    let alreadySeen = false;
+    try {
+      alreadySeen = window.localStorage.getItem(INTRO_SEEN_KEY) === '1';
+    } catch {
+      alreadySeen = false;
+    }
+
+    const forceIntro = new URLSearchParams(window.location.search).get('intro') === '1';
+    if (alreadySeen && !forceIntro) return;
+
+    const timer = window.setTimeout(() => {
+      setShouldMount(true);
+      setIsOpen(true);
+    }, 750);
+
+    return () => window.clearTimeout(timer);
+  }, [isExcludedRoute]);
+
+  const handleClose = () => {
+    setIsOpen(false);
+    try {
+      window.localStorage.setItem(INTRO_SEEN_KEY, '1');
+    } catch {
+      // Ignora erro caso localStorage esteja bloqueado
+    }
+  };
+
+  if (!shouldMount) return null;
+
+  return (
+    <Suspense fallback={null}>
+      <IntroOnboardingModal isOpen={isOpen} onClose={handleClose} />
     </Suspense>
   );
 }
@@ -185,6 +244,7 @@ function PublicLayout({ children }: { children: React.ReactNode }) {
           <Footer />
           <MobileBottomNav />
           <DeferredShakeToReport />
+          <DeferredIntroOnboarding />
           <LazySeriesDetailsModal />
         </div>
       </NotificationProvider>
